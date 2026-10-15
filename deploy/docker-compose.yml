@@ -1,5 +1,5 @@
-# Jumble web client — serves on 127.0.0.1:8080, TLS is handled by the reverse proxy
-# already running on the host (rtard.de). See Caddyfile.host-snippet for the site block.
+# Jumble web client — reachable by Caddy (container) as `jumble:8080` on the
+# nitter-edge network; also published on 127.0.0.1:8080 for direct host access.
 services:
   jumble:
     build:
@@ -8,4 +8,11 @@ services:
     container_name: jumble
     ports:
       - "127.0.0.1:8080:8080"
+    networks:
+      - default
+      - nitter-edge
     restart: unless-stopped
+
+networks:
+  nitter-edge:
+    external: true
