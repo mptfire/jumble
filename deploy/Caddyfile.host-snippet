@@ -1,0 +1,7 @@
+# Append to the reverse proxy config already running on the VPS (rtard.de).
+# This assumes Caddy — if it's nginx, the equivalent is a server block proxying to 127.0.0.1:8080
+# with `proxy_http_version 1.1` and standard WebSocket upgrade headers.
+
+jumble.rtard.de {
+	reverse_proxy 127.0.0.1:8080
+}

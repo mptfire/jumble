@@ -1,0 +1,13 @@
+# Internal server config for the jumble container (listens on :8080, plain HTTP —
+# TLS terminates at your existing reverse proxy on the host)
+:8080 {
+	root * /srv
+	encode zstd gzip
+	try_files {path} /index.html
+	file_server
+
+	# long-cache the hashed assets, never the entry point
+	@immutable path /assets/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+	header / Cache-Control "no-cache"
+}

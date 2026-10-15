@@ -134,7 +134,11 @@ export const ApplicationDataKey = {
   NOTIFICATIONS_SEEN_AT: 'seen_notifications_at'
 }
 
+/** Our own relay (strfry) — first on every default list. Update here if it moves. */
+export const OWN_RELAY_URLS = ['wss://strfry.rtard.de/']
+
 export const BIG_RELAY_URLS = [
+  ...OWN_RELAY_URLS,
   'wss://nos.lol/',
   'wss://relay.primal.net/',
   'wss://offchain.pub/',
@@ -277,12 +281,14 @@ export const NIP_96_SERVICE = [
 export const DEFAULT_NIP_96_SERVICE = 'https://nostr.build'
 
 export const DEFAULT_NOSTRCONNECT_RELAY = [
+  ...OWN_RELAY_URLS,
   'wss://bucket.coracle.social/',
   'wss://relay.primal.net/',
   'wss://relay.ditto.pub/'
 ]
 
 export const DEFAULT_DM_RELAYS = [
+  ...OWN_RELAY_URLS,
   'wss://nip17.com/',
   'wss://nos.lol/',
   'wss://relay.primal.net/',

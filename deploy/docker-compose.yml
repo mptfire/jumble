@@ -1,0 +1,11 @@
+# Jumble web client — serves on 127.0.0.1:8080, TLS is handled by the reverse proxy
+# already running on the host (rtard.de). See Caddyfile.host-snippet for the site block.
+services:
+  jumble:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    container_name: jumble
+    ports:
+      - "127.0.0.1:8080:8080"
+    restart: unless-stopped
