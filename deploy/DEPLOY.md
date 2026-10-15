@@ -15,7 +15,7 @@ reverse proxy already running on the VPS for rtard.de.
    cd deploy && docker compose up -d --build
    ```
 4. Verify: `curl -sI https://jumble.rtard.de` → 200, and the app loads with the relay picker
-   showing `wss://strfry.rtard.de/` first.
+   showing `wss://relay.mypathtofire.de/` first.
 
 ## Relay configuration
 
