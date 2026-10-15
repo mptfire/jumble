@@ -11,6 +11,7 @@ export const JUMBLE_API_BASE_URL = 'https://api.jumble.social'
 export const JUMBLE_BLOSSOM_SERVER = 'https://blossom.jumble.social/'
 
 export const RECOMMENDED_BLOSSOM_SERVERS = [
+  'https://blossom.mypathtofire.de/',
   JUMBLE_BLOSSOM_SERVER,
   'https://blossom.band/',
   'https://blossom.primal.net/',
@@ -135,7 +136,7 @@ export const ApplicationDataKey = {
 }
 
 /** Our own relay (strfry) — first on every default list. Update here if it moves. */
-export const OWN_RELAY_URLS = ['wss://strfry.rtard.de/']
+export const OWN_RELAY_URLS = ['wss://relay.mypathtofire.de/']
 
 export const BIG_RELAY_URLS = [
   ...OWN_RELAY_URLS,
