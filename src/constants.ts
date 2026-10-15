@@ -11,11 +11,8 @@ export const JUMBLE_API_BASE_URL = 'https://api.jumble.social'
 export const JUMBLE_BLOSSOM_SERVER = 'https://blossom.jumble.social/'
 
 export const RECOMMENDED_BLOSSOM_SERVERS = [
-  'https://blossom.mypathtofire.de/',
-  JUMBLE_BLOSSOM_SERVER,
-  'https://blossom.band/',
-  'https://blossom.primal.net/',
-  'https://nostr.media/'
+  'https://blossom.mypathtofire.de/'
+  // privacy fork: no third-party mirrors by default
 ]
 
 export const StorageKey = {

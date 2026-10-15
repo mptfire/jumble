@@ -66,7 +66,7 @@ class LocalStorageService {
   private hideContentMentioningMutedUsers: boolean = false
   private notificationListStyle: TNotificationStyle = NOTIFICATION_LIST_STYLE.DETAILED
   private mediaAutoLoadPolicy: TMediaAutoLoadPolicy = MEDIA_AUTO_LOAD_POLICY.ALWAYS
-  private showLinkPreviews: boolean = true
+  private showLinkPreviews: boolean = false // privacy fork: opt-in (scout.jumble.social sees every previewed link)
   private profilePictureAutoLoadPolicy: TProfilePictureAutoLoadPolicy =
     PROFILE_PICTURE_AUTO_LOAD_POLICY.ALWAYS
   private shownCreateWalletGuideToastPubkeys: Set<string> = new Set()
@@ -354,7 +354,7 @@ class LocalStorageService {
       this.mediaAutoLoadPolicy = mediaAutoLoadPolicy as TMediaAutoLoadPolicy
     }
 
-    this.showLinkPreviews = window.localStorage.getItem(StorageKey.SHOW_LINK_PREVIEWS) !== 'false'
+    this.showLinkPreviews = window.localStorage.getItem(StorageKey.SHOW_LINK_PREVIEWS) === 'true'
 
     const profilePictureAutoLoadPolicy = window.localStorage.getItem(
       StorageKey.PROFILE_PICTURE_AUTO_LOAD_POLICY
