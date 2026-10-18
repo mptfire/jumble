@@ -24,6 +24,13 @@ export const RECOMMENDED_BLOSSOM_SERVERS = [
 // (relay NIP-11 contact field); no secrets here.
 export const OWNER_PUBKEY = '1408bad049bab8a38b976075affe413c3521bbeef62cc4ce3555299f4971f2ca'
 export const OWNER_BLOSSOM_SERVERS = ['https://blossom.mypathtofire.de/']
+export const OWNER_RELAY_URLS = [
+  'wss://relay.mypathtofire.de/',
+  'wss://nos.lol/',
+  'wss://nostr.wine/',
+  'wss://nostr.mom/',
+  'wss://relay.fountain.fm/'
+]
 
 export const StorageKey = {
   VERSION: 'version',
