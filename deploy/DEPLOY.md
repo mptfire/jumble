@@ -3,6 +3,12 @@
 Static build, served by Caddy in a container on 127.0.0.1:8080. TLS terminates at the
 reverse proxy already running on the VPS for rtard.de.
 
+## Access (reality check 2026-10-18)
+
+- SSH: `ssh -i ~/.ssh/oracle_key billy@178.254.39.208` (host: ecoblu). The
+  `id_ed25519_netcup_deploy` key is **not** valid on this host (root/deploy denied).
+- No git on the VPS and no `.git` in the tree — updates are tarball swaps, not `git pull`.
+
 ## One-time
 
 1. **DNS** — add an A record: `jumble.rtard.de → 178.254.39.208`
@@ -23,12 +29,19 @@ reverse proxy already running on the VPS for rtard.de.
 (`BIG_RELAY_URLS`, `DEFAULT_NOSTRCONNECT_RELAY`, `DEFAULT_DM_RELAYS`). If the strfry URL
 changes, that one constant is the only place to touch, then rebuild.
 
-## Updating
+## Updating (tarball swap)
 
 ```bash
-git pull
-cd deploy && docker compose up -d --build   # rebuilds the image with the new dist
+curl -sSL -o /tmp/jumble.tar.gz https://api.github.com/repos/mptfire/jumble/tarball/deploy/rtard-de
+scp -i ~/.ssh/oracle_key /tmp/jumble.tar.gz billy@178.254.39.208:
+ssh -i ~/.ssh/oracle_key billy@178.254.39.208
+mv ~/jumble ~/jumble.old-$(date +%Y%m%d%H%M)   # keep for rollback
+mkdir ~/jumble && tar -xzf ~/jumble.tar.gz -C ~/jumble --strip-components=1
+cd ~/jumble/deploy && docker compose up -d --build
 ```
+
+Verify: etag in `curl -sI https://jumble.rtard.de` changes; container `Up`.
+Alternative: install git on ecoblu and restore the plain `git pull` flow.
 
 ## Login guidance
 
