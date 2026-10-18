@@ -18,6 +18,13 @@ export const RECOMMENDED_BLOSSOM_SERVERS = [
   // deliberately NOT recommended; add it via Settings → Media upload if you want it.
 ]
 
+// privacy fork: owner override — when this npub is logged in, the personal
+// blossom server replaces the public mirrors as the effective default
+// (uploads AND the auto-published kind:10063). Npub is public already
+// (relay NIP-11 contact field); no secrets here.
+export const OWNER_PUBKEY = '1408bad049bab8a38b976075affe413c3521bbeef62cc4ce3555299f4971f2ca'
+export const OWNER_BLOSSOM_SERVERS = ['https://blossom.mypathtofire.de/']
+
 export const StorageKey = {
   VERSION: 'version',
   THEME_SETTING: 'themeSetting',
