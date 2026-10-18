@@ -1,6 +1,12 @@
 import LoginDialog from '@/components/LoginDialog'
 import PasswordInputDialog from '@/components/PasswordInputDialog'
-import { ApplicationDataKey, ExtendedKind } from '@/constants'
+import {
+  ApplicationDataKey,
+  ExtendedKind,
+  OWNER_PUBKEY,
+  OWNER_RELAY_URLS,
+  StorageKey
+} from '@/constants'
 import {
   createDeletionRequestDraftEvent,
   createFollowListDraftEvent,
@@ -272,6 +278,14 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         setPinnedUsersEvent(storedPinnedUsersEvent)
       }
 
+      if (
+        account.pubkey === OWNER_PUBKEY &&
+        !window.localStorage.getItem(StorageKey.DEFAULT_RELAY_URLS)
+      ) {
+        // privacy fork: seed the owner's personal relay set once per browser —
+        // only when the user has never customized their relay list.
+        storage.setDefaultRelayUrls(OWNER_RELAY_URLS)
+      }
       const defaultRelays = getDefaultRelayUrls()
       const relayListEvents = await client.fetchEvents(defaultRelays, {
         kinds: [kinds.RelayList],
