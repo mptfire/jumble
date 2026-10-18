@@ -1,4 +1,4 @@
-import { RECOMMENDED_BLOSSOM_SERVERS } from '@/constants'
+import { OWNER_BLOSSOM_SERVERS, OWNER_PUBKEY, RECOMMENDED_BLOSSOM_SERVERS } from '@/constants'
 import { BoundedMap } from '@/lib/bounded-map'
 import { createBlossomServerListDraftEvent } from '@/lib/draft-event'
 import { getMediaMeta } from '@/lib/media-meta'
@@ -161,7 +161,8 @@ class MediaUploadService {
       // The user has no Blossom server list yet. Use the default servers for this
       // upload right away, and asynchronously create a server list for the user in
       // the background so it's persisted for next time.
-      servers = RECOMMENDED_BLOSSOM_SERVERS
+      servers =
+        pubkey === OWNER_PUBKEY ? OWNER_BLOSSOM_SERVERS : RECOMMENDED_BLOSSOM_SERVERS
       this.ensureBlossomServerList(pubkey)
     }
     const fallbackServer = options?.fallbackBlossomServer
@@ -448,8 +449,10 @@ class MediaUploadService {
       if (existing.length > 0) return
       if (!client.signer) return
 
+      const recommended =
+        pubkey === OWNER_PUBKEY ? OWNER_BLOSSOM_SERVERS : RECOMMENDED_BLOSSOM_SERVERS
       const event = await client.signer.signEvent(
-        createBlossomServerListDraftEvent(RECOMMENDED_BLOSSOM_SERVERS)
+        createBlossomServerListDraftEvent(recommended)
       )
       const relays = await client.determineTargetRelays(event)
       await client.publishEvent(relays, event)
