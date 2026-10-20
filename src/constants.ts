@@ -23,8 +23,12 @@ export const RECOMMENDED_BLOSSOM_SERVERS = [
 // (uploads AND the auto-published kind:10063). Npub is public already
 // (relay NIP-11 contact field); no secrets here.
 export const OWNER_PUBKEY = '1408bad049bab8a38b976075affe413c3521bbeef62cc4ce3555299f4971f2ca'
-export const OWNER_BLOSSOM_SERVERS = ['https://blossom.mypathtofire.de/']
+export const OWNER_BLOSSOM_SERVERS = [
+  'https://canoe.rtard.de/',
+  'https://blossom.mypathtofire.de/'
+]
 export const OWNER_RELAY_URLS = [
+  'wss://canoe.rtard.de/',
   'wss://relay.mypathtofire.de/',
   'wss://nos.lol/',
   'wss://nostr.wine/',
