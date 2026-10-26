@@ -8,17 +8,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle
-} from '@/components/ui/dialog'
-import { Drawer, DrawerContent } from '@/components/ui/drawer'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { DialogDescription, DialogHeader } from '@/components/ui/dialog'
+import { Modal, ModalContent } from '@/components/ui/modal'
 import { toNewArticle, toNote } from '@/lib/link'
+import { cn } from '@/lib/utils'
 import { useSecondaryPage } from '@/PageManager'
 import { useDraftBox } from '@/providers/DraftBoxProvider'
 import { useNostr } from '@/providers/NostrProvider'
@@ -199,107 +192,63 @@ export default function PostEditor({
 
   return (
     <>
-      {isSmallScreen ? (
-        <Drawer open={open} onOpenChange={handleOpenChange}>
-          <DrawerContent
-            className="h-dvh max-h-dvh overflow-hidden"
-            title={highlightedText ? t('Create Highlight') : t('New Note')}
-            onEscapeKeyDown={(e) => {
-              if (postEditor.isSuggestionPopupOpen) {
-                e.preventDefault()
-                postEditor.closeSuggestionPopup()
-              }
-            }}
-          >
-            <ScrollArea className="min-h-0 flex-1">{content}</ScrollArea>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
-          <DialogContent
-            className="max-w-2xl p-0 sm:rounded-2xl"
-            withoutClose
-            onEscapeKeyDown={(e) => {
-              if (postEditor.isSuggestionPopupOpen) {
-                e.preventDefault()
-                postEditor.closeSuggestionPopup()
-              }
-            }}
-          >
-            <ScrollArea className="h-full max-h-[85vh]">
-              <DialogHeader className="px-6 pt-6 pb-0">
-                <div className="flex items-center justify-between gap-2">
-                  <DialogTitle className="min-w-0 flex-1">
-                    {highlightedText ? (
-                      t('Create Highlight')
-                    ) : (
-                      <Title parentStuff={effectiveParentStuff} />
-                    )}
-                  </DialogTitle>
-                  <DraftsButton onClick={openDraftsFromEditor} />
-                </div>
-                <DialogDescription className="hidden" />
-              </DialogHeader>
-              {content}
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
-      )}
-
-      {isSmallScreen ? (
-        <Drawer open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <DrawerContent title={t('Save as draft?')}>
-            <div className="space-y-4 px-4 pb-2">
-              <div className="space-y-1 text-center">
-                <div className="text-base font-semibold">{t('Save as draft?')}</div>
-                <div className="text-muted-foreground text-sm">
-                  {t('Your changes will be saved to the drafts box.')}
-                </div>
+      {/* Keep the portal and editor in the same tree positions.
+          Only presentation changes when resizing, preserving TipTap history,
+          selection, uploads, poll options and the other local editor state. */}
+      <Modal open={open} onOpenChange={handleOpenChange}>
+        <ModalContent
+          className={cn(
+            isSmallScreen ? 'h-dvh max-h-dvh' : 'max-h-[85dvh] max-w-2xl sm:rounded-2xl'
+          )}
+          bodyClassName="overflow-hidden"
+          title={highlightedText ? t('Create Highlight') : t('New Note')}
+          onEscapeKeyDown={(e) => {
+            if (postEditor.isSuggestionPopupOpen) {
+              e.preventDefault()
+              postEditor.closeSuggestionPopup()
+            }
+          }}
+        >
+          <DialogHeader className={cn('shrink-0 px-6 pt-6 pb-0', isSmallScreen && 'hidden')}>
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex-1 text-lg leading-none font-semibold tracking-tight">
+                {highlightedText ? (
+                  t('Create Highlight')
+                ) : (
+                  <Title parentStuff={effectiveParentStuff} />
+                )}
               </div>
-              <div className="flex flex-col gap-2">
-                <Button size="lg" className="w-full" onClick={onConfirmSave}>
-                  {t('Save')}
-                </Button>
-                <Button size="lg" variant="secondary" className="w-full" onClick={onConfirmCancel}>
-                  {t('Keep editing')}
-                </Button>
-                <Button
-                  size="lg"
-                  variant="destructive"
-                  className="w-full"
-                  onClick={onConfirmDiscard}
-                >
-                  {t('Discard')}
-                </Button>
-              </div>
+              <DraftsButton onClick={openDraftsFromEditor} />
             </div>
-          </DrawerContent>
-        </Drawer>
-      ) : (
-        <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>{t('Save as draft?')}</AlertDialogTitle>
-              <AlertDialogDescription>
-                {t('Your changes will be saved to the drafts box.')}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={onConfirmCancel} className="sm:me-auto">
-                {t('Keep editing')}
-              </AlertDialogCancel>
-              <AlertDialogAction
-                variant="ghost"
-                onClick={onConfirmDiscard}
-                className="text-destructive hover:text-destructive"
-              >
-                {t('Discard')}
-              </AlertDialogAction>
-              <AlertDialogAction onClick={onConfirmSave}>{t('Save')}</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
+            <DialogDescription className="hidden" />
+          </DialogHeader>
+          {content}
+        </ModalContent>
+      </Modal>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('Save as draft?')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('Your changes will be saved to the drafts box.')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={onConfirmCancel} className="sm:me-auto">
+              {t('Keep editing')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              variant="ghost"
+              onClick={onConfirmDiscard}
+              className="text-destructive hover:text-destructive"
+            >
+              {t('Discard')}
+            </AlertDialogAction>
+            <AlertDialogAction onClick={onConfirmSave}>{t('Save')}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

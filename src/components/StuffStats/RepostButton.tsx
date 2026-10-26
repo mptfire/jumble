@@ -1,15 +1,16 @@
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent } from '@/components/ui/drawer'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu'
+import { Modal, ModalContent } from '@/components/ui/modal'
 import { useFilteredRepostCount } from '@/hooks/useFilteredRepostCount'
-import { useStuffStatsById } from '@/hooks/useStuffStatsById'
 import { useStuff } from '@/hooks/useStuff'
+import { useStuffStatsById } from '@/hooks/useStuffStatsById'
 import { createRepostDraftEvent } from '@/lib/draft-event'
+import { formatError } from '@/lib/error'
 import { getNoteBech32Id } from '@/lib/event'
 import { cn } from '@/lib/utils'
 import { useNostr } from '@/providers/NostrProvider'
@@ -19,10 +20,9 @@ import { Loader, PencilLine, Repeat } from 'lucide-react'
 import { Event } from 'nostr-tools'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 import PostEditor from '../PostEditor'
 import { formatCount } from './utils'
-import { formatError } from '@/lib/error'
-import { toast } from 'sonner'
 
 export default function RepostButton({ stuff }: { stuff: Event | string }) {
   const { t } = useTranslation()
@@ -105,72 +105,72 @@ export default function RepostButton({ stuff }: { stuff: Event | string }) {
     />
   )
 
-  if (isSmallScreen) {
-    return (
-      <>
-        {trigger}
-        <Drawer open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
-          <DrawerContent title={t('Repost')}>
-            <div className="py-2">
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsDrawerOpen(false)
-                  repost()
-                }}
-                disabled={!canRepost}
-                className="w-full justify-start gap-4 p-6 text-lg [&_svg]:size-5"
-                variant="ghost"
-              >
-                <Repeat /> {t('Repost')}
-              </Button>
-              <Button
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setIsDrawerOpen(false)
-                  checkLogin(() => {
-                    setIsPostDialogOpen(true)
-                  })
-                }}
-                className="w-full justify-start gap-4 p-6 text-lg [&_svg]:size-5"
-                variant="ghost"
-              >
-                <PencilLine /> {t('Quote')}
-              </Button>
-            </div>
-          </DrawerContent>
-        </Drawer>
-        {postEditor}
-      </>
-    )
-  }
+  const menu = isSmallScreen ? (
+    <>
+      {trigger}
+      <Modal open={isDrawerOpen} onOpenChange={setIsDrawerOpen}>
+        <ModalContent title={t('Repost')}>
+          <div className="py-2">
+            <Button
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsDrawerOpen(false)
+                repost()
+              }}
+              disabled={!canRepost}
+              className="w-full justify-start gap-4 p-6 text-lg [&_svg]:size-5"
+              variant="ghost"
+            >
+              <Repeat /> {t('Repost')}
+            </Button>
+            <Button
+              onClick={(e) => {
+                e.stopPropagation()
+                setIsDrawerOpen(false)
+                checkLogin(() => {
+                  setIsPostDialogOpen(true)
+                })
+              }}
+              className="w-full justify-start gap-4 p-6 text-lg [&_svg]:size-5"
+              variant="ghost"
+            >
+              <PencilLine /> {t('Quote')}
+            </Button>
+          </div>
+        </ModalContent>
+      </Modal>
+    </>
+  ) : (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation()
+            repost()
+          }}
+          disabled={!canRepost}
+        >
+          <Repeat /> {t('Repost')}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onClick={(e) => {
+            e.stopPropagation()
+            checkLogin(() => {
+              setIsPostDialogOpen(true)
+            })
+          }}
+        >
+          <PencilLine /> {t('Quote')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
 
   return (
     <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation()
-              repost()
-            }}
-            disabled={!canRepost}
-          >
-            <Repeat /> {t('Repost')}
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation()
-              checkLogin(() => {
-                setIsPostDialogOpen(true)
-              })
-            }}
-          >
-            <PencilLine /> {t('Quote')}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {menu}
+      {/* Keep the composer outside the responsive menu branch so its draft survives resizing. */}
       {postEditor}
     </>
   )
