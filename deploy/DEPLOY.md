@@ -16,18 +16,29 @@ reverse proxy already running on the VPS for rtard.de.
    serving rtard.de, then reload it (`caddy reload --config ...` or `systemctl reload caddy`).
    If the host proxy is nginx instead, use a server block for `jumble.rtard.de` proxying to
    `127.0.0.1:8080` with WebSocket upgrade headers.
-3. **Start the container:**
+3. **Container network** — the compose file attaches to the shared `nitter-edge` network as
+   `external: true`; create it if it doesn't exist yet (idempotent):
+   ```bash
+   docker network create nitter-edge 2>/dev/null || true
+   ```
+4. **Start the container:**
    ```bash
    cd deploy && docker compose up -d --build
    ```
-4. Verify: `curl -sI https://jumble.rtard.de` → 200, and the app loads with the relay picker
-   showing `wss://relay.mypathtofire.de/` first.
+5. Verify: `curl -sI https://jumble.rtard.de` → 200, and the app loads. Relay picker:
+   visitors get the site default (`BIG_RELAY_URLS`, led by `wss://relay.mypathtofire.de/`);
+   the owner's login seeds `OWNER_RELAY_URLS`, led by `wss://canoe.rtard.de/` (one-time per
+   browser, only if the relay list was never customized).
 
 ## Relay configuration
 
-`src/constants.ts` puts our relay first on every default list via `OWN_RELAY_URLS`
-(`BIG_RELAY_URLS`, `DEFAULT_NOSTRCONNECT_RELAY`, `DEFAULT_DM_RELAYS`). If the strfry URL
-changes, that one constant is the only place to touch, then rebuild.
+Two constants in `src/constants.ts`, deliberately separate:
+
+- `OWN_RELAY_URLS` (the personal strfry) — spliced first into every **site-wide** default
+  (`BIG_RELAY_URLS`, `DEFAULT_NOSTRCONNECT_RELAY`, `DEFAULT_DM_RELAYS`). If the strfry URL
+  changes, that one constant is the only place to touch, then rebuild.
+- `OWNER_RELAY_URLS` — the **owner's** login seed set (canoe first, then strfry + active
+  relays), written once per browser on owner login. Not used for site defaults.
 
 ## Updating (tarball swap)
 
@@ -51,6 +62,9 @@ bunker instead.
 
 ## Next steps (optional)
 
-- **Blossom media server** at `blossom.rtard.de` so uploads stop going to nostr.build
-  (see `DEFAULT_NIP_96_SERVICE` in `src/constants.ts` and the media-server defaults nearby).
+- **NIP-96 uploader decision (open, F3):** `DEFAULT_NIP_96_SERVICE` is still `nostr.build`
+  (third party). Blossom is the default upload path and is already handled — site default is
+  public mirrors (`RECOMMENDED_BLOSSOM_SERVERS`), the owner's npub overrides to personal
+  servers (`OWNER_BLOSSOM_SERVERS` = canoe + blossom.mypathtofire.de). Remaining choice: keep
+  nostr.build for the rare explicit NIP-96 path, or stand up a NIP-96 endpoint on our infra.
 - **Own bunker** for NIP-46 login so no key material lives in the browser.

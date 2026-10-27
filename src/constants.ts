@@ -153,7 +153,12 @@ export const ApplicationDataKey = {
   NOTIFICATIONS_SEEN_AT: 'seen_notifications_at'
 }
 
-/** Our own relay (strfry) — first on every default list. Update here if it moves. */
+/**
+ * Our own relay (strfry) — first on every SITE-WIDE default list (BIG/DM/
+ * nostrconnect). Update here if it moves. Distinct from OWNER_RELAY_URLS
+ * above: that one is the owner's personal login seed set, not a site default.
+ * Names intentionally kept close to upstream's to minimize merge friction.
+ */
 export const OWN_RELAY_URLS = ['wss://relay.mypathtofire.de/']
 
 export const BIG_RELAY_URLS = [

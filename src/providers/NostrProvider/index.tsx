@@ -283,6 +283,10 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
       if (
         account.pubkey === OWNER_PUBKEY &&
+        // Key-existence check (absent = never customized), deliberately raw:
+        // storage.getDefaultRelayUrls() substitutes a default, so it can't
+        // distinguish "absent" from "set". Reads the same mirrored key the
+        // Electron bridge maintains for storage service writes.
         !window.localStorage.getItem(StorageKey.DEFAULT_RELAY_URLS)
       ) {
         // privacy fork: seed the owner's personal relay set once per browser —

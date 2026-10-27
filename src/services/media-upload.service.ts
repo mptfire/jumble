@@ -18,6 +18,13 @@ type UploadOptions = {
 
 export const UPLOAD_ABORTED_ERROR_MSG = 'Upload aborted'
 
+// privacy fork: effective default upload targets. The owner's npub gets the
+// personal servers (canoe + own blossom); everyone else gets public mirrors.
+// Single source of truth for both the upload path and the auto-published
+// kind:10063 so the two can never drift.
+const getDefaultBlossomServers = (pubkey: string) =>
+  pubkey === OWNER_PUBKEY ? OWNER_BLOSSOM_SERVERS : RECOMMENDED_BLOSSOM_SERVERS
+
 // HEAD /upload statuses that mean the Blossom server doesn't implement the
 // BUD-06 pre-flight check, rather than a rejection of this specific blob. For
 // these we fall through to the actual PUT instead of failing fast.
@@ -161,8 +168,7 @@ class MediaUploadService {
       // The user has no Blossom server list yet. Use the default servers for this
       // upload right away, and asynchronously create a server list for the user in
       // the background so it's persisted for next time.
-      servers =
-        pubkey === OWNER_PUBKEY ? OWNER_BLOSSOM_SERVERS : RECOMMENDED_BLOSSOM_SERVERS
+      servers = getDefaultBlossomServers(pubkey)
       this.ensureBlossomServerList(pubkey)
     }
     const fallbackServer = options?.fallbackBlossomServer
@@ -449,8 +455,7 @@ class MediaUploadService {
       if (existing.length > 0) return
       if (!client.signer) return
 
-      const recommended =
-        pubkey === OWNER_PUBKEY ? OWNER_BLOSSOM_SERVERS : RECOMMENDED_BLOSSOM_SERVERS
+      const recommended = getDefaultBlossomServers(pubkey)
       const event = await client.signer.signEvent(
         createBlossomServerListDraftEvent(recommended)
       )
