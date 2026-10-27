@@ -1,7 +1,13 @@
-# Deploying jumble.rtard.de
+# Deploying jumble.rtard.de / jumble.mptfire.de
 
 Static build, served by Caddy in a container on 127.0.0.1:8080. TLS terminates at the
 reverse proxy already running on the VPS for rtard.de.
+
+**Alias live 2026-10-27:** `https://jumble.mptfire.de/` serves the same container (vhost in
+the ecoblu edge Caddyfile; part of the mptfire.de rename, see
+`~/Blitzwolf/dev/notes/mypathtofire-de-migration-list-2026-10-19.md`). Both hostnames stay
+until the rename completes; client constants still point at rtard.de names because
+relay/blossom.mptfire.de are pending a nostr-vps root task (vhost snippet in the same note).
 
 ## Access (reality check 2026-10-18)
 
