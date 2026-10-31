@@ -64,13 +64,11 @@ export default function PostEditor({
     if (!open || !pubkey || !parentStuff || highlightedText) return undefined
     return postDraftService.findDraftForParent(pubkey, parentStuff)
   }, [initialDraft, open, pubkey, parentStuff, highlightedText])
-  const bypassConfirmRef = useRef(false)
   // What to run once the "save as draft?" question is resolved. Receives the
   // saved draft id when the user chose to save (undefined on discard).
   const pendingProceedRef = useRef<((savedId?: string) => void) | null>(null)
 
   const closeWithoutConfirm = () => {
-    bypassConfirmRef.current = true
     setOpen(false)
   }
 
@@ -131,11 +129,6 @@ export default function PostEditor({
       setOpen(true)
       return
     }
-    if (bypassConfirmRef.current) {
-      bypassConfirmRef.current = false
-      setOpen(false)
-      return
-    }
     // Swallow the spurious outside-dismiss that can fire right after opening from
     // the drafts box (stacked-dialog focus/outside-click race on mobile).
     if (Date.now() - mountedAtRef.current < 500) {
@@ -179,7 +172,7 @@ export default function PostEditor({
         defaultContent={defaultContent}
         parentStuff={parentStuff}
         close={closeEditor}
-        requestClose={() => setOpen(false)}
+        requestClose={() => runWithSaveGuard(closeWithoutConfirm)}
         onOpenDrafts={openDraftsFromEditor}
         onParentClick={navigateToParent}
         openFrom={openFrom}
@@ -197,6 +190,7 @@ export default function PostEditor({
           selection, uploads, poll options and the other local editor state. */}
       <Modal open={open} onOpenChange={handleOpenChange}>
         <ModalContent
+          fitVisualViewport
           className={cn(
             isSmallScreen ? 'h-dvh max-h-dvh' : 'max-h-[85dvh] max-w-2xl sm:rounded-2xl'
           )}

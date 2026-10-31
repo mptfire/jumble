@@ -139,6 +139,8 @@ type ModalContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.C
   bodyClassName?: string
   /** Show the desktop close control. Mobile sheets use swipe/outside dismissal. */
   withoutClose?: boolean
+  /** Resize a tall composer to the visible viewport instead of lifting the entire sheet. */
+  fitVisualViewport?: boolean
 }
 
 // Titles nested in layout elements still use Radix's shared title id. Only
@@ -162,6 +164,7 @@ const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
       title,
       hideHandle,
       withoutClose = true,
+      fitVisualViewport = false,
       onPointerDownOutside,
       onOpenAutoFocus,
       ...props
@@ -183,7 +186,7 @@ const ModalContent = React.forwardRef<HTMLDivElement, ModalContentProps>(
       [ref]
     )
 
-    useVisualViewportInset(contentEl, direction === 'bottom')
+    useVisualViewportInset(contentEl, direction === 'bottom', fitVisualViewport)
 
     useVerticalDragToClose({
       contentEl,
@@ -300,13 +303,63 @@ export { Modal, ModalClose, ModalContent, ModalDescription, ModalTitle, ModalTri
  * Driven by `visualViewport.resize/scroll` and `focusin/focusout` so we
  * recompute whenever either the keyboard or the active field changes.
  */
-export function useVisualViewportInset(el: HTMLElement | null, enabled: boolean) {
+export function useVisualViewportInset(
+  el: HTMLElement | null,
+  enabled: boolean,
+  fitVisualViewport = false
+) {
   React.useEffect(() => {
     if (!enabled || !el) return
     const vv = window.visualViewport
     if (!vv) return
+    const originalPaddingBottom = el.style.paddingBottom
+    const originalTop = el.style.top
+    const originalHeight = el.style.height
+    // Chromium on Android can resize the fixed-position containing block for
+    // us. This avoids relying on visualViewport measurements around its bottom
+    // address bar. Keep the setting local to the open composer.
+    const viewportMeta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]')
+    const useNativeResize =
+      fitVisualViewport &&
+      /Android/i.test(navigator.userAgent) &&
+      /(?:Chrome|Chromium)\//.test(navigator.userAgent) &&
+      !!viewportMeta
+    const originalViewportContent = viewportMeta?.getAttribute('content')
+    const resizedViewportContent = (originalViewportContent ?? '')
+      .split(',')
+      .map((part) => part.trim())
+      .filter((part) => part && !/^interactive-widget\s*=/i.test(part))
+      .concat('interactive-widget=resizes-content')
+      .join(', ')
+    let largestViewportHeight = window.innerHeight
+    if (useNativeResize) viewportMeta.setAttribute('content', resizedViewportContent)
 
     const apply = () => {
+      if (fitVisualViewport) {
+        if (useNativeResize) {
+          largestViewportHeight = Math.max(largestViewportHeight, window.innerHeight)
+          el.style.top = '0px'
+          el.style.bottom = '0px'
+          el.style.height = '100%'
+          el.style.maxHeight = '100%'
+          el.style.paddingBottom =
+            largestViewportHeight - window.innerHeight > 100 ? '0px' : originalPaddingBottom
+          return
+        }
+        // Position both edges directly in visual-viewport coordinates. Deriving
+        // a bottom inset from innerHeight assumes it matches the fixed-position
+        // containing block, which can differ while mobile browser chrome and
+        // the keyboard resize/pan the viewport, leaving a gap below the sheet.
+        const keyboardHeight = Math.max(window.innerHeight - vv.height - vv.offsetTop, 0)
+        el.style.top = `${vv.offsetTop}px`
+        el.style.bottom = 'auto'
+        el.style.height = `${vv.height}px`
+        el.style.maxHeight = `${vv.height}px`
+        // The keyboard already covers the home indicator. Keeping the sheet's
+        // safe-area padding here leaves an empty strip above the keyboard.
+        el.style.paddingBottom = keyboardHeight > 0 ? '0px' : originalPaddingBottom
+        return
+      }
       const active = document.activeElement as HTMLElement | null
       const isEditable =
         !!active &&
@@ -334,6 +387,7 @@ export function useVisualViewportInset(el: HTMLElement | null, enabled: boolean)
 
     vv.addEventListener('resize', apply)
     vv.addEventListener('scroll', apply)
+    window.addEventListener('resize', apply)
     document.addEventListener('focusin', apply)
     document.addEventListener('focusout', apply)
     apply()
@@ -341,11 +395,22 @@ export function useVisualViewportInset(el: HTMLElement | null, enabled: boolean)
     return () => {
       vv.removeEventListener('resize', apply)
       vv.removeEventListener('scroll', apply)
+      window.removeEventListener('resize', apply)
       document.removeEventListener('focusin', apply)
       document.removeEventListener('focusout', apply)
       el.style.bottom = ''
+      if (fitVisualViewport) {
+        el.style.top = originalTop
+        el.style.height = originalHeight
+        el.style.maxHeight = ''
+        el.style.paddingBottom = originalPaddingBottom
+      }
+      if (useNativeResize && viewportMeta.getAttribute('content') === resizedViewportContent) {
+        if (originalViewportContent === null) viewportMeta.removeAttribute('content')
+        else viewportMeta.setAttribute('content', originalViewportContent ?? '')
+      }
     }
-  }, [enabled, el])
+  }, [enabled, el, fitVisualViewport])
 }
 
 /**
@@ -353,14 +418,16 @@ export function useVisualViewportInset(el: HTMLElement | null, enabled: boolean)
  * the whole content surface and defers to scrollable containers (including itself):
  *
  *   - Upward swipes: never engage; the inner scroll runs as usual.
- *   - Downward swipes starting inside a scrolled element: the scroll wins.
+ *   - Swipes starting inside a scrolled element: the scroll owns the entire
+ *     gesture, even if it reaches the top before the finger is released.
  *   - Downward swipes starting elsewhere (or in a scrollable already at
- *     scrollTop=0): engage drag mode, follow the finger, dismiss on release
+ *     scrollTop=0): engage drag mode, follow the pointer, dismiss on release
  *     past a distance or velocity threshold.
  *
  * Native touch listeners (not React handlers) are required because we need
  * a non-passive `touchmove` to `preventDefault` once the drag engages —
- * React synthetic touch handlers are passive in modern React.
+ * React synthetic touch handlers are passive in modern React. Mouse moves and
+ * releases are tracked on the document so dragging can leave the drawer.
  */
 function useVerticalDragToClose({
   contentEl,
@@ -371,6 +438,16 @@ function useVerticalDragToClose({
   enabled: boolean
   onClose: () => void
 }) {
+  const [closeAttempt, setCloseAttempt] = React.useState(0)
+  // A caller can reject dismissal or open a confirmation without changing open.
+  // Force a commit, then inspect Radix's committed state before the next paint.
+  // Accepted closes keep their offset for the exit animation.
+  React.useLayoutEffect(() => {
+    if (!closeAttempt || !contentEl || contentEl.dataset.state !== 'open') return
+    contentEl.style.transition = 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)'
+    contentEl.style.transform = ''
+  }, [closeAttempt, contentEl])
+
   const onCloseRef = React.useRef(onClose)
   React.useEffect(() => {
     onCloseRef.current = onClose
@@ -387,7 +464,7 @@ function useVerticalDragToClose({
     let velocity = 0
     let armed = false
     let dragging = false
-    let scrollableAtStart: HTMLElement | null = null
+    let scrollTopAtStart = 0
 
     // Cheap scrollHeight comparison first; getComputedStyle forces layout and
     // is what we want to avoid for the common case where the touched node
@@ -409,43 +486,36 @@ function useVerticalDragToClose({
       return null
     }
 
-    const onTouchStart = (e: TouchEvent) => {
-      if (e.target instanceof Element && e.target.closest('[data-drawer-swipe-lock]')) {
-        // Interactive gestures such as sortable drag handles own this touch.
-        // Do not arm the drawer's swipe-to-close gesture for the same event.
-        armed = false
-        dragging = false
-        scrollableAtStart = null
-        return
-      }
-      if (e.touches.length !== 1) {
-        // Multi-touch: cancel any in-flight drag so pinch etc. work cleanly.
-        armed = false
-        dragging = false
-        return
-      }
-      const touch = e.touches[0]
-      startY = touch.clientY
-      lastY = startY
+    let mouseActive = false
+
+    const startDrag = (target: EventTarget | null, y: number) => {
+      if (target instanceof Element && target.closest('[data-drawer-swipe-lock]')) return
+      startY = y
+      lastY = y
       lastTime = performance.now()
       velocity = 0
       armed = true
       dragging = false
-      scrollableAtStart = findScrollableAncestor(e.target)
+      scrollTopAtStart = findScrollableAncestor(target)?.scrollTop ?? 0
     }
 
-    const onTouchMove = (e: TouchEvent) => {
-      if (!armed || e.touches.length !== 1) return
-      const touch = e.touches[0]
-      const delta = touch.clientY - startY
+    const moveDrag = (y: number, e: Event) => {
+      if (!armed) return
+      const delta = y - startY
 
       if (!dragging) {
+        // Once the gesture scrolls upward, keep it with the content even if
+        // the finger reverses direction later in the same gesture.
+        if (delta < -8) {
+          armed = false
+          return
+        }
         // Don't engage drag for upward / negligible motion — leaves the
         // inner scroll responsive to small touch jitter.
         if (delta <= 8) return
         // If the gesture starts inside something that's already scrolled,
         // the inner scroll owns the gesture, not the drawer.
-        if (scrollableAtStart && scrollableAtStart.scrollTop > 0) return
+        if (scrollTopAtStart > 0) return
 
         dragging = true
         el.style.transition = 'none'
@@ -459,57 +529,110 @@ function useVerticalDragToClose({
 
       const now = performance.now()
       const dt = now - lastTime
-      if (dt > 0) velocity = (touch.clientY - lastY) / dt
-      lastY = touch.clientY
+      if (dt > 0) velocity = (y - lastY) / dt
+      lastY = y
       lastTime = now
     }
 
-    const onTouchEnd = (e: TouchEvent) => {
+    const endDrag = (y: number) => {
       const wasDragging = dragging
       armed = false
       dragging = false
-      scrollableAtStart = null
+      scrollTopAtStart = 0
       if (!wasDragging) return
 
-      const lastTouch = e.changedTouches[0]
-      const delta = lastTouch ? lastTouch.clientY - startY : 0
+      const delta = y - startY
       // ~25% of drawer height (min 80px) OR a clear downward flick.
       const closeByDistance = delta > Math.max(el.offsetHeight * 0.25, 80)
       const closeByVelocity = velocity > 0.6
       if (closeByDistance || closeByVelocity) {
-        // Hand off to Radix's exit animation; clearing the transform lets it
-        // animate from rest position rather than from the drag offset.
+        // The exit keyframes only specify the destination. Keep the current
+        // transform as their starting point until Radix unmounts the content.
         el.style.transition = ''
-        el.style.transform = ''
         onCloseRef.current()
+        setCloseAttempt((attempt) => attempt + 1)
       } else {
         el.style.transition = 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)'
         el.style.transform = ''
       }
     }
 
-    const onTouchCancel = () => {
+    const cancelDrag = () => {
       if (dragging) {
         el.style.transition = 'transform 200ms cubic-bezier(0.32, 0.72, 0, 1)'
         el.style.transform = ''
       }
       armed = false
       dragging = false
-      scrollableAtStart = null
+      scrollTopAtStart = 0
     }
+
+    const onTouchStart = (e: TouchEvent) => {
+      cancelDrag()
+      mouseActive = false
+      if (e.touches.length === 1) startDrag(e.target, e.touches[0].clientY)
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1) moveDrag(e.touches[0].clientY, e)
+    }
+    const onTouchEnd = (e: TouchEvent) => endDrag(e.changedTouches[0]?.clientY ?? startY)
+
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0 || armed || e.defaultPrevented) return
+      // Keep text fields, links, controls and sortable handles usable.
+      if (
+        e.target instanceof Element &&
+        e.target.closest(
+          'button, a, input, textarea, select, [role="button"], [contenteditable]:not([contenteditable="false"]), [data-drawer-swipe-lock]'
+        )
+      )
+        return
+      startDrag(e.target, e.clientY)
+      mouseActive = armed
+      // Prevent text selection and native image dragging during the gesture.
+      if (mouseActive) e.preventDefault()
+    }
+    const onMouseMove = (e: MouseEvent) => {
+      if (!mouseActive) return
+      if (!(e.buttons & 1)) {
+        onMouseCancel()
+        return
+      }
+      moveDrag(e.clientY, e)
+    }
+    const onMouseUp = (e: MouseEvent) => {
+      if (!mouseActive || e.button !== 0) return
+      mouseActive = false
+      endDrag(e.clientY)
+    }
+    const onMouseCancel = () => {
+      if (!mouseActive) return
+      mouseActive = false
+      cancelDrag()
+    }
+    const doc = el.ownerDocument
+    const view = doc.defaultView
+    el.addEventListener('mousedown', onMouseDown)
+    doc.addEventListener('mousemove', onMouseMove)
+    doc.addEventListener('mouseup', onMouseUp)
+    view?.addEventListener('blur', onMouseCancel)
 
     el.addEventListener('touchstart', onTouchStart, { passive: true })
     // touchmove must be non-passive so we can preventDefault once the drag
     // engages and stop the page from scrolling underneath us.
     el.addEventListener('touchmove', onTouchMove, { passive: false })
     el.addEventListener('touchend', onTouchEnd, { passive: true })
-    el.addEventListener('touchcancel', onTouchCancel, { passive: true })
+    el.addEventListener('touchcancel', cancelDrag, { passive: true })
 
     return () => {
+      el.removeEventListener('mousedown', onMouseDown)
+      doc.removeEventListener('mousemove', onMouseMove)
+      doc.removeEventListener('mouseup', onMouseUp)
+      view?.removeEventListener('blur', onMouseCancel)
       el.removeEventListener('touchstart', onTouchStart)
       el.removeEventListener('touchmove', onTouchMove)
       el.removeEventListener('touchend', onTouchEnd)
-      el.removeEventListener('touchcancel', onTouchCancel)
+      el.removeEventListener('touchcancel', cancelDrag)
       el.style.transform = ''
       el.style.transition = ''
     }

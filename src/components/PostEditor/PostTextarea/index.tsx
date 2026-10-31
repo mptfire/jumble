@@ -15,6 +15,7 @@ import {
   Dispatch,
   forwardRef,
   SetStateAction,
+  useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useRef,
@@ -22,6 +23,7 @@ import {
 } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ClipboardAndDropHandler } from './ClipboardAndDropHandler'
+import { PreserveComposition } from './PreserveComposition'
 import Emoji from './Emoji'
 import emojiSuggestion from './Emoji/suggestion'
 import Mention from './Mention'
@@ -110,6 +112,7 @@ const PostTextarea = forwardRef<
         Text,
         UndoRedo,
         HardBreak,
+        PreserveComposition,
         Placeholder.configure({
           placeholder:
             placeholder ??
@@ -162,6 +165,29 @@ const PostTextarea = forwardRef<
         setText(parseEditorJsonToText(props.editor.getJSON()))
       }
     })
+
+    useEffect(() => {
+      const viewport = window.visualViewport
+      if (!editor || !viewport) return
+      let frame = 0
+      const revealCaret = () => {
+        cancelAnimationFrame(frame)
+        frame = requestAnimationFrame(() => {
+          // Wait until the modal has resized for the keyboard, then scroll the
+          // selection within its content area rather than the whole editable.
+          if (!editor.isDestroyed && editor.isFocused) editor.commands.scrollIntoView()
+        })
+      }
+      viewport.addEventListener('resize', revealCaret)
+      viewport.addEventListener('scroll', revealCaret)
+      editor.on('focus', revealCaret)
+      return () => {
+        cancelAnimationFrame(frame)
+        viewport.removeEventListener('resize', revealCaret)
+        viewport.removeEventListener('scroll', revealCaret)
+        editor.off('focus', revealCaret)
+      }
+    }, [editor])
 
     useImperativeHandle(ref, () => ({
       appendText: (text: string, addNewline = false) => {
@@ -239,7 +265,7 @@ const PostTextarea = forwardRef<
         className="flex flex-1 flex-col"
         onValueChange={setTabValue}
       >
-        <div className="px-5 pt-3 sm:px-6">
+        <div className="bg-background sticky top-0 z-20 shrink-0 px-5 pt-3 sm:px-6">
           <div
             ref={headerRef}
             className={cn('flex gap-2', stackActions ? 'flex-col-reverse gap-1' : 'items-center')}
