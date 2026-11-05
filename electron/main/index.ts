@@ -10,7 +10,7 @@ import {
   session,
   shell
 } from 'electron'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import path from 'node:path'
 import { registerIpcHandlers, unregisterIpcHandlers } from './ipc.js'
@@ -63,6 +63,16 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
+// Keep development sessions and their single-instance lock separate from the
+// installed app. Configure this before acquiring the lock or opening any store.
+if (!app.isPackaged) {
+  const devUserData = path.join(app.getPath('appData'), 'jumble-dev')
+  mkdirSync(devUserData, { recursive: true })
+  app.setName('Jumble Dev')
+  app.setPath('userData', devUserData)
+  app.setPath('sessionData', devUserData)
+}
+
 let win: BrowserWindow | null = null
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 const manager = new RelayManager()
@@ -108,6 +118,10 @@ function createWindow() {
     }
   })
 
+  if (process.platform === 'linux' || process.platform === 'win32') {
+    win.removeMenu()
+  }
+
   win.once('ready-to-show', () => {
     if (savedState.isMaximized) {
       win?.maximize()
@@ -149,7 +163,7 @@ function registerAppProtocol() {
     if (!insideRoot) {
       return new Response('Forbidden', { status: 403 })
     }
-    let isFile = false
+    let isFile: boolean
     try {
       isFile = existsSync(filePath) && statSync(filePath).isFile()
     } catch {

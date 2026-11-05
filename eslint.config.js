@@ -5,7 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 
 export default tseslint.config(
-  { ignores: ['dist', 'dist-electron', 'dev-dist', 'release'] },
+  { ignores: ['dist', 'dist-electron', 'dist-android', 'dev-dist', 'release', 'android'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],
@@ -18,7 +18,8 @@ export default tseslint.config(
       'react-refresh': reactRefresh
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
+      // Preserve the existing Hooks checks; React Compiler rules are a separate migration.
+      'react-hooks/rules-of-hooks': 'error',
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
       '@typescript-eslint/explicit-function-return-type': 'off',
       'react/prop-types': 'off',

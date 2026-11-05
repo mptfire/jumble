@@ -2,7 +2,6 @@ import { TImetaInfo } from '@/types'
 import { ArrowLeft, ArrowRight } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import ClickableCard from '../ClickableCard'
 import Image from '../Image'
 import { ImageSize, isValidImageSize } from '../Image/display-size'
 import { getVisibleImageIndexes } from './pagination'
@@ -15,7 +14,7 @@ export default function ImageStrip({
   onPhotoClick
 }: {
   images: TImetaInfo[]
-  onPhotoClick: (event: React.MouseEvent, index: number) => void
+  onPhotoClick?: (event: React.MouseEvent, index: number) => void
 }) {
   const { t, i18n } = useTranslation()
   const direction = i18n.dir()
@@ -157,9 +156,16 @@ export default function ImageStrip({
         scrollByImage(next)
       }}
     >
-      <ClickableCard
+      <div
         ref={viewportElement}
-        className="scrollbar-hide cursor-default overflow-x-auto overscroll-x-contain"
+        className="scrollbar-hide overflow-x-auto overscroll-x-contain"
+        onClickCapture={(event) => {
+          // Keep clicks bubbling to document, but shield the parent note after a drag.
+          event.currentTarget.toggleAttribute(
+            'data-clickable-card',
+            suppressClick.current && event.detail !== 0
+          )
+        }}
         onPointerDown={(event) => {
           scrollTargetImage.current = null
           suppressClick.current = false
@@ -177,7 +183,7 @@ export default function ImageStrip({
           if (!drag) return
           const distance = event.clientX - drag.x
           if (!drag.moved && Math.abs(distance) < 5) return
-          // Capture on the image button, or the nested card boundary for gaps.
+          // Capture on the image button, or the viewport for gaps.
           if (!drag.moved) drag.target.setPointerCapture(event.pointerId)
           drag.moved = true
           suppressClick.current = true
@@ -214,18 +220,22 @@ export default function ImageStrip({
                       ? 'var(--image-strip-bleed-start, var(--image-strip-bleed, 0px))'
                       : undefined
                 }}
-                aria-label={t('Open image')}
+                aria-label={t(onPhotoClick ? 'Open image' : 'Pictures')}
+                aria-disabled={!onPhotoClick || undefined}
+                tabIndex={onPhotoClick ? 0 : -1}
                 onClick={(event) => {
                   if (suppressClick.current && event.detail !== 0) {
                     event.preventDefault()
                     return
                   }
-                  onPhotoClick(event, index)
+                  onPhotoClick?.(event, index)
                 }}
               >
                 <Image
                   image={image}
-                  classNames={{ wrapper: 'h-full w-full cursor-zoom-in border' }}
+                  classNames={{
+                    wrapper: `h-full w-full border ${onPhotoClick ? 'cursor-zoom-in' : 'cursor-grab active:cursor-grabbing'}`
+                  }}
                   onImageLoad={(_url, img) => {
                     const size = { width: img.naturalWidth, height: img.naturalHeight }
                     if (!isValidImageSize(size)) return
@@ -241,7 +251,7 @@ export default function ImageStrip({
             )
           })}
         </div>
-      </ClickableCard>
+      </div>
       {canScrollPrev && (
         <button
           type="button"

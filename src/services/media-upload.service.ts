@@ -5,7 +5,14 @@ import { getMediaMeta } from '@/lib/media-meta'
 import { stripImageMetadata } from '@/lib/strip-image-metadata'
 import { simplifyUrl } from '@/lib/url'
 import { TDraftEvent, TMediaUploadServiceConfig } from '@/types'
-import { BlobDescriptor, BlossomClient, SignedEvent } from 'blossom-client-sdk'
+import {
+  Actions,
+  BlobDescriptor,
+  createUploadAuth,
+  encodeAuthorizationHeader,
+  getBlobSha256,
+  SignedEvent
+} from 'blossom-client-sdk'
 import { z } from 'zod'
 import client from './client.service'
 import storage from './local-storage.service'
@@ -111,7 +118,7 @@ class MediaUploadService {
     if (!has('m') && file.type) tags.push(['m', file.type])
     if (!has('size')) tags.push(['size', String(file.size)])
     if (!has('x')) {
-      tags.push(['x', sha256 ?? (await BlossomClient.getFileSha256(file))])
+      tags.push(['x', sha256 ?? (await getBlobSha256(file))])
     }
 
     if (!has('dim') || !has('thumbhash')) {
@@ -178,7 +185,7 @@ class MediaUploadService {
     // configured server succeeds.
     const uploadServers =
       fallbackServer && !servers.includes(fallbackServer) ? [...servers, fallbackServer] : servers
-    const auth = await BlossomClient.createUploadAuth(signer, file, {
+    const auth = await createUploadAuth(signer, file, {
       message: 'Uploading media file'
     })
 
@@ -205,7 +212,7 @@ class MediaUploadService {
             options?.signal?.aborted ||
             (error instanceof Error && error.message === UPLOAD_ABORTED_ERROR_MSG)
           ) {
-            throw new Error(UPLOAD_ABORTED_ERROR_MSG)
+            throw new Error(UPLOAD_ABORTED_ERROR_MSG, { cause: error })
           }
           failedServers.add(server)
           lastError = error
@@ -230,7 +237,7 @@ class MediaUploadService {
     )
     if (mirrorServers.length > 0) {
       await Promise.allSettled(
-        mirrorServers.map((server) => BlossomClient.mirrorBlob(server, blob, { auth }))
+        mirrorServers.map((server) => Actions.mirrorBlob(server, blob, { auth }))
       )
     }
 
@@ -262,8 +269,8 @@ class MediaUploadService {
     signal?: AbortSignal
   ): Promise<BlobDescriptor> {
     const url = new URL('/upload', server)
-    const sha256 = await BlossomClient.getFileSha256(file)
-    const authHeader = BlossomClient.encodeAuthorizationHeader(auth)
+    const sha256 = await getBlobSha256(file)
+    const authHeader = encodeAuthorizationHeader(auth)
     const baseHeaders: Record<string, string> = {
       Authorization: authHeader,
       'X-SHA-256': sha256
@@ -274,9 +281,9 @@ class MediaUploadService {
         return await fetch(url, { ...init, signal })
       } catch (err) {
         if (signal?.aborted || (err as Error)?.name === 'AbortError') {
-          throw new Error(UPLOAD_ABORTED_ERROR_MSG)
+          throw new Error(UPLOAD_ABORTED_ERROR_MSG, { cause: err })
         }
-        throw new Error('Network error')
+        throw new Error('Network error', { cause: err })
       }
     }
 
@@ -414,9 +421,7 @@ class MediaUploadService {
           // always empty over HTTP/2).
           const body = xhr.response
           const serverMessage =
-            body && typeof body === 'object' && typeof body.message === 'string'
-              ? body.message
-              : ''
+            body && typeof body === 'object' && typeof body.message === 'string' ? body.message : ''
           const statusInfo = `${xhr.status}${xhr.statusText ? ' ' + xhr.statusText : ''}`
           reject(new Error(serverMessage ? `${statusInfo}: ${serverMessage}` : statusInfo))
         }

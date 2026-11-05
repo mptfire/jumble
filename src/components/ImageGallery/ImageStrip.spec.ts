@@ -47,14 +47,19 @@ function pointer(type: string, clientX: number) {
 }
 
 describe('gallery mouse dragging inside a note card', () => {
-  it.each(['wheel', 'pointerdown'])(
-    'keeps the clicked dot active through intermediate positions until completion or %s input',
-    async (input) => {
+  it.each([
+    { input: 'wheel', preview: false },
+    { input: 'pointerdown', preview: false },
+    { input: 'wheel', preview: true },
+    { input: 'pointerdown', preview: true }
+  ])(
+    'keeps pagination working until completion or $input input (preview: $preview)',
+    async ({ input, preview }) => {
       await act(async () =>
         root.render(
           createElement(ImageStrip, {
             images: Array.from({ length: 4 }, (_, index) => ({ url: `${index}.jpg` })),
-            onPhotoClick: vi.fn()
+            onPhotoClick: preview ? undefined : vi.fn()
           })
         )
       )
@@ -114,7 +119,7 @@ describe('gallery mouse dragging inside a note card', () => {
     }
   )
 
-  it('ignores clicks in the gaps without blocking document listeners or other note clicks', async () => {
+  it('opens the note from gaps and edges while keeping photo clicks and document listeners working', async () => {
     const navigate = vi.fn()
     const openPhoto = vi.fn()
     await act(async () =>
@@ -141,19 +146,27 @@ describe('gallery mouse dragging inside a note card', () => {
         viewport.click()
       })
       expect(openPhoto).not.toHaveBeenCalled()
-      expect(navigate).not.toHaveBeenCalled()
+      expect(navigate).toHaveBeenCalledTimes(2)
       expect(documentClick).toHaveBeenCalledTimes(2)
 
+      await act(async () => button.click())
+      expect(openPhoto).toHaveBeenCalledOnce()
+      expect(navigate).toHaveBeenCalledTimes(2)
+
       await act(async () => (container.firstElementChild as HTMLElement).click())
-      expect(navigate).toHaveBeenCalledOnce()
+      expect(navigate).toHaveBeenCalledTimes(3)
     } finally {
       document.removeEventListener('click', documentClick)
     }
   })
 
-  it.each(['image', 'gap', 'edge'])(
-    'allows dragging from the %s without opening the photo or note',
-    async (origin) => {
+  it.each(
+    ['image', 'gap', 'edge'].flatMap((origin) =>
+      [false, true].map((preview) => ({ origin, preview }))
+    )
+  )(
+    'allows dragging from the $origin without opening the photo or note (preview: $preview)',
+    async ({ origin, preview }) => {
       const navigate = vi.fn()
       const openPhoto = vi.fn()
       await act(async () =>
@@ -163,7 +176,7 @@ describe('gallery mouse dragging inside a note card', () => {
             { onClick: navigate },
             createElement(ImageStrip, {
               images: [{ url: 'one.jpg' }, { url: 'two.jpg' }],
-              onPhotoClick: openPhoto
+              onPhotoClick: preview ? undefined : openPhoto
             })
           )
         )
@@ -201,13 +214,13 @@ describe('gallery mouse dragging inside a note card', () => {
         expect(navigate).not.toHaveBeenCalled()
         expect(documentClick).toHaveBeenCalledOnce()
 
-        // A fresh, stationary click must still open the photo.
+        // A fresh click opens photos only when the lightbox action is enabled.
         await act(async () => {
           photo.dispatchEvent(pointer('pointerdown', 60))
           photo.dispatchEvent(pointer('pointerup', 60))
           photo.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }))
         })
-        expect(openPhoto).toHaveBeenCalledOnce()
+        expect(openPhoto).toHaveBeenCalledTimes(preview ? 0 : 1)
         expect(navigate).not.toHaveBeenCalled()
       } finally {
         document.removeEventListener('click', documentClick)

@@ -36,12 +36,23 @@ npm install
 npm run dev
 ```
 
-For a web-only build on a system that cannot download the Electron binary, skip that download while keeping platform-specific build dependencies such as Rollup:
+Builds use the TypeScript 7 native compiler (`tsc`), installed as `@typescript/native`. The `typescript` dependency aliases the official TypeScript 6 compatibility package so ESLint can continue using its compiler API. Keep both dependencies when updating the toolchain. See the [official side-by-side setup](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-60).
+
+The dependency overrides move `minimatch` 10.x consumers to 11.0.3+ and Workbox's `glob` to 14.0.3+ to address [pattern amplification](https://github.com/advisories/GHSA-g3hv-75wg-m249) and [cancellation handling](https://github.com/advisories/GHSA-3g3m-2fjr-6pw4) advisories. Older `minimatch` consumers retain their declared versions because their APIs differ. Remove these overrides when the upstream tools adopt compatible patched releases.
+
+For a web-only build on a system that cannot download the Electron binary, skip that download while keeping platform-specific build dependencies such as Rolldown and TypeScript:
 
 ```bash
 ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install
 npm run build
 ```
+
+Capacitor packages (`@capacitor/*`) are optional and are only needed for Android.
+Web and Electron builds use a local substitute and can build without those packages
+installed. Android builds resolve and type-check the actual Capacitor packages.
+A normal `npm install` still includes optional dependencies. Avoid globally omitting
+all optional dependencies unless you also provide the platform binaries required
+by build tools such as Rolldown.
 
 ## Run Docker
 
@@ -57,6 +68,20 @@ docker compose up --build -d
 ```
 
 After finishing, access: http://localhost:8089
+
+## Run as Android App (Capacitor)
+
+Android reuses the web UI and business logic, with native encrypted storage,
+back navigation, deep links, and local notifications. Requires Android SDK 36
+and JDK 21.
+
+```sh
+npm run android:run  # Build and launch on an emulator or connected device
+npm run android:apk  # Build a debug APK
+```
+
+See [Android development and release notes](docs/android.md) for setup,
+architecture, signing, and the initial integration's limitations.
 
 ## Run as Desktop App (Electron)
 
@@ -79,7 +104,17 @@ npm run electron:build
 npm run electron:preview
 ```
 
+Unpackaged Electron runs (`electron:dev` and `electron:preview`) use a separate
+`jumble-dev` data directory so they can run alongside the installed app.
+Development sessions start with their own accounts and settings.
+
 The web build (`npm run dev`, `npm run build`) is unaffected and never loads any Electron-only code.
+
+## Continuous integration
+
+Branch pushes and pull requests run lint, the test suite, and a web/PWA build. Windows x64 and Linux x64/arm64 jobs then build installers and launch the unpacked applications. The smoke test checks packaged runtime files, the preload IPC bridge, initial rendering, and Settings navigation. On Linux without a keychain it also exercises password setup on the fresh CI runner. Screenshots and logs are uploaded and downloaded again to verify artifact handling.
+
+`scripts/electron-smoke.mjs <unpacked-app-directory>` requires a disposable CI runner because it may initialize application storage. To check package contents locally without starting the application, append `--verify-only`.
 
 ## Community mode (Optional)
 

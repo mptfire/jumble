@@ -1,3 +1,4 @@
+import { copyText } from '@/lib/native-system'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -39,11 +40,9 @@ export default function InviteCodeDialog({
     const getInviteCode = async () => {
       setIsFetching(true)
       try {
-        if (relayInfo.pubkey) {
-          const code = await relayMembershipService.requestInviteCode(
-            relayInfo.url,
-            relayInfo.pubkey
-          )
+        const relayPubkey = relayInfo.self || relayInfo.pubkey
+        if (relayPubkey) {
+          const code = await relayMembershipService.requestInviteCode(relayInfo.url, relayPubkey)
           if (code) {
             setInviteCode(code)
           } else {
@@ -62,7 +61,7 @@ export default function InviteCodeDialog({
   const handleCopyInviteCode = () => {
     if (!inviteCode) return
 
-    navigator.clipboard.writeText(inviteCode)
+    copyText(inviteCode)
     toast.success(t('Invite code copied to clipboard'))
     setCopied(true)
 

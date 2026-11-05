@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron/simple'
-import { createSharedConfig } from './vite.shared'
+import { createSharedConfig } from './vite.shared.ts'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -14,7 +14,8 @@ export default defineConfig(({ mode }) => ({
         vite: {
           build: {
             outDir: 'dist-electron/main',
-            rollupOptions: {
+            sourcemap: true,
+            rolldownOptions: {
               // Keep native/electron-only deps external; bundle nostr-tools etc.
               external: ['electron', 'ws']
             }
@@ -26,7 +27,8 @@ export default defineConfig(({ mode }) => ({
         vite: {
           build: {
             outDir: 'dist-electron/preload',
-            rollupOptions: {
+            sourcemap: true,
+            rolldownOptions: {
               external: ['electron'],
               output: {
                 format: 'cjs',

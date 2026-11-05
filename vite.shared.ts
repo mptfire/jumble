@@ -1,8 +1,8 @@
 import { execSync } from 'child_process'
 import path from 'path'
 import { loadEnv, type UserConfig } from 'vite'
-import packageJson from './package.json'
-import { normalizeUrl } from './src/lib/url'
+import packageJson from './package.json' with { type: 'json' }
+import { normalizeUrl } from './src/lib/url.ts'
 
 const getGitHash = () => {
   try {
@@ -22,11 +22,15 @@ const getAppVersion = () => {
   }
 }
 
-export const createSharedConfig = (mode: string, base: string): UserConfig => {
+export const createSharedConfig = (mode: string, base: string, native = false): UserConfig => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
     base,
+    build: {
+      // Publish mappings alongside bundles so DevTools can resolve source locations.
+      sourcemap: true
+    },
     define: {
       'import.meta.env.GIT_COMMIT': getGitHash(),
       'import.meta.env.APP_VERSION': getAppVersion(),
@@ -40,7 +44,15 @@ export const createSharedConfig = (mode: string, base: string): UserConfig => {
     },
     resolve: {
       alias: {
-        '@': path.resolve(__dirname, './src')
+        '@': path.resolve(import.meta.dirname, './src'),
+        ...(native
+          ? {}
+          : Object.fromEntries(
+              ['core', 'app', 'local-notifications'].map((name) => [
+                `@capacitor/${name}`,
+                path.resolve(import.meta.dirname, './src/lib/capacitor-web.ts')
+              ])
+            ))
       }
     }
   }
