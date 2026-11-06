@@ -14,7 +14,8 @@ export const RECOMMENDED_BLOSSOM_SERVERS = [
   'https://blossom.band/',
   'https://blossom.primal.net/',
   'https://nostr.media/'
-  // privacy fork: public mirrors only — own blossom (blossom.mypathtofire.de) is
+  // privacy fork: public mirrors only — the owner's servers (canoe.rtard.de +
+  // blossom.mptfire.de, formerly blossom.mypathtoire.de) are
   // deliberately NOT recommended; add it via Settings → Media upload if you want it.
 ]
 
@@ -25,11 +26,11 @@ export const RECOMMENDED_BLOSSOM_SERVERS = [
 export const OWNER_PUBKEY = '1408bad049bab8a38b976075affe413c3521bbeef62cc4ce3555299f4971f2ca'
 export const OWNER_BLOSSOM_SERVERS = [
   'https://canoe.rtard.de/',
-  'https://blossom.mypathtofire.de/'
+  'https://blossom.mptfire.de/'
 ]
 export const OWNER_RELAY_URLS = [
   'wss://canoe.rtard.de/',
-  'wss://relay.mypathtofire.de/',
+  'wss://relay.mptfire.de/',
   'wss://nos.lol/',
   'wss://nostr.wine/',
   'wss://nostr.mom/',
@@ -162,7 +163,7 @@ export const ApplicationDataKey = {
  * above: that one is the owner's personal login seed set, not a site default.
  * Names intentionally kept close to upstream's to minimize merge friction.
  */
-export const OWN_RELAY_URLS = ['wss://relay.mypathtofire.de/']
+export const OWN_RELAY_URLS = ['wss://relay.mptfire.de/']
 
 export const BIG_RELAY_URLS = [
   ...OWN_RELAY_URLS,
@@ -301,12 +302,12 @@ export const CODY_PUBKEY = '8125b911ed0e94dbe3008a0be48cfe5cd0c0b05923cfff917ae7
 export const NIP_96_SERVICE = [
   'https://mockingyou.com',
   'https://nostpic.com',
-  'https://nostr.build', // default
+  'https://nostr.build',
   'https://nostrcheck.me',
   'https://nostrmedia.com',
   'https://files.sovbit.host'
 ]
-export const DEFAULT_NIP_96_SERVICE = 'https://nostr.build'
+export const DEFAULT_NIP_96_SERVICE = '' // privacy fork (F3): no default NIP-96 uploader — users pick explicitly
 
 export const DEFAULT_NOSTRCONNECT_RELAY = [
   ...OWN_RELAY_URLS,

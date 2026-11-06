@@ -3,11 +3,11 @@
 Static build, served by Caddy in a container on 127.0.0.1:8080. TLS terminates at the
 reverse proxy already running on the VPS for rtard.de.
 
-**Alias live 2026-10-27:** `https://jumble.mptfire.de/` serves the same container (vhost in
-the ecoblu edge Caddyfile; part of the mptfire.de rename, see
-`~/Blitzwolf/dev/notes/mypathtofire-de-migration-list-2026-10-19.md`). Both hostnames stay
-until the rename completes; client constants still point at rtard.de names because
-relay/blossom.mptfire.de are pending a nostr-vps root task (vhost snippet in the same note).
+**2026-11-05 — mptfire.de client flip LIVE:** client constants now point at
+`relay.mptfire.de` + `blossom.mptfire.de` (site-wide default relay `OWN_RELAY_URLS`, owner
+seed set, owner blossom list). `jumble.mptfire.de` serves the same container (edge vhost).
+The old rtard.de / mypathtofire.de endpoints remain up during the transition; retire them
+per plan Phase 6 (traffic-log + sunset gates).
 
 ## Access (reality check 2026-10-18)
 
@@ -40,9 +40,10 @@ relay/blossom.mptfire.de are pending a nostr-vps root task (vhost snippet in the
 
 Two constants in `src/constants.ts`, deliberately separate:
 
-- `OWN_RELAY_URLS` (the personal strfry) — spliced first into every **site-wide** default
-  (`BIG_RELAY_URLS`, `DEFAULT_NOSTRCONNECT_RELAY`, `DEFAULT_DM_RELAYS`). If the strfry URL
-  changes, that one constant is the only place to touch, then rebuild.
+- `OWN_RELAY_URLS` (the personal strfry, now `wss://relay.mptfire.de/`) — spliced first
+  into every **site-wide** default (`BIG_RELAY_URLS`, `DEFAULT_NOSTRCONNECT_RELAY`,
+  `DEFAULT_DM_RELAYS`). If the strfry URL changes, that one constant is the only place to
+  touch, then rebuild.
 - `OWNER_RELAY_URLS` — the **owner's** login seed set (canoe first, then strfry + active
   relays), written once per browser on owner login. Not used for site defaults.
 
