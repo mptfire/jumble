@@ -13,6 +13,7 @@ const CONNECT_TIMEOUT_MS = 10_000
 
 export class BunkerSigner implements ISigner {
   signer: NBunkerSigner | null = null
+  private pool?: Nip46Pool
   private clientSecretKey: Uint8Array
   private pubkey: string | null = null
 
@@ -23,31 +24,58 @@ export class BunkerSigner implements ISigner {
   async login(
     bunker: string,
     isInitialConnection = true,
-    connectTimeout = CONNECT_TIMEOUT_MS
+    connectTimeout = CONNECT_TIMEOUT_MS,
+    userPubkey?: string
   ): Promise<string> {
     const bunkerPointer = await parseBunkerInput(bunker)
     if (!bunkerPointer) {
       throw new Error('Invalid bunker')
     }
 
-    this.signer = NBunkerSigner.fromBunker(this.clientSecretKey, bunkerPointer, {
-      pool: new Nip46Pool(client.relayPool),
-      onauth: (url) => {
-        openExternalUrl(url)
-      }
+    await this.close()
+    this.pool = new Nip46Pool(client.relayPool, {
+      urls: bunkerPointer.relays,
+      acquire: (urls) => client.acquireSignerRelayUrls(urls)
     })
-    if (isInitialConnection) {
-      await Promise.race([
-        this.signer.connect(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Bunker connect timeout')), connectTimeout)
-        )
-      ])
+    try {
+      this.signer = NBunkerSigner.fromBunker(this.clientSecretKey, bunkerPointer, {
+        pool: this.pool,
+        onauth: (url) => {
+          openExternalUrl(url)
+        }
+      })
+      if (isInitialConnection) {
+        await Promise.race([
+          this.signer.connect(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('Bunker connect timeout')), connectTimeout)
+          )
+        ])
+        return await this.getPublicKey()
+      }
+      // The URL identifies the remote signer, not necessarily the user's key.
+      // A restored account already knows its user key and needs no network query.
+      if (userPubkey) {
+        this.pubkey = userPubkey
+        return userPubkey
+      }
       return await this.getPublicKey()
+    } catch (error) {
+      await this.close()
+      throw error
     }
-    // For reconnection, skip getPublicKey - the caller already knows the pubkey
-    this.pubkey = bunkerPointer.pubkey
-    return this.pubkey
+  }
+
+  restore(bunker: string, userPubkey: string) {
+    return this.login(bunker, false, CONNECT_TIMEOUT_MS, userPubkey)
+  }
+
+  async close() {
+    this.pool?.dispose()
+    this.pool = undefined
+    await this.signer?.close()
+    this.signer = null
+    this.pubkey = null
   }
 
   async getPublicKey(timeout = 10_000) {

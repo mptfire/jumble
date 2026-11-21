@@ -1287,6 +1287,11 @@ export default {
       '넓은 화면의 단일 열 모드에서 피드 옆에 표시됩니다.',
     'Hide this section': '이 섹션 숨기기',
     Participants: '참여자',
-    'Reposts × 1 · Quotes × 2 · Loaded replies × 1': '재게시 × 1 · 인용 × 2 · 불러온 답글 × 1'
+    'Reposts × 1 · Quotes × 2 · Loaded replies × 1': '재게시 × 1 · 인용 × 2 · 불러온 답글 × 1',
+    'Share profile': '프로필 공유',
+    'Login with Android signer': 'Android 서명 앱으로 로그인',
+    'Profile followed by': '팔로워',
+    'People you follow who also follow this user.':
+      '내가 팔로우하는 사람 중 이 사용자도 팔로우하는 사람들입니다.'
   }
 }

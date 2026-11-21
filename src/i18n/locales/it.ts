@@ -1314,6 +1314,11 @@ export default {
     'Hide this section': 'Nascondi questa sezione',
     Participants: 'Partecipanti',
     'Reposts × 1 · Quotes × 2 · Loaded replies × 1':
-      'Ricondivisioni × 1 · Citazioni × 2 · Risposte caricate × 1'
+      'Ricondivisioni × 1 · Citazioni × 2 · Risposte caricate × 1',
+    'Share profile': 'Condividi profilo',
+    'Login with Android signer': 'Accedi con un firmatario Android',
+    'Profile followed by': 'Seguito da',
+    'People you follow who also follow this user.':
+      'Persone che segui e che seguono anche questo utente.'
   }
 }

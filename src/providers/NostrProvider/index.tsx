@@ -1,3 +1,4 @@
+import { useAccountRelayList } from './useAccountRelayList'
 import dialogService from '@/services/dialog.service'
 import LoginDialog from '@/components/LoginDialog'
 import PasswordInputDialog from '@/components/PasswordInputDialog'
@@ -10,9 +11,6 @@ import {
 } from '@/constants'
 import {
   createDeletionRequestDraftEvent,
-  createFollowListDraftEvent,
-  createMuteListDraftEvent,
-  createRelayListDraftEvent,
   createSeenNotificationsAtDraftEvent
 } from '@/lib/draft-event'
 import {
@@ -25,12 +23,14 @@ import { getProfileFromEvent, getRelayListFromEvent } from '@/lib/event-metadata
 import { formatPubkey, pubkeyToNpub } from '@/lib/pubkey'
 import { getDefaultRelayUrls } from '@/lib/relay'
 import { isSameAccount } from '@/lib/account'
+import { isAndroid } from '@/lib/platform'
 import client from '@/services/client.service'
 import customEmojiService from '@/services/custom-emoji.service'
 import dmService from '@/services/dm.service'
 import encryptionKeyService from '@/services/encryption-key.service'
 import indexedDb from '@/services/indexed-db.service'
 import storage from '@/services/local-storage.service'
+import { setupNewAccount } from '@/services/new-account-setup'
 import stuffStatsService from '@/services/stuff-stats.service'
 import {
   ISigner,
@@ -54,6 +54,7 @@ import { useDeletedEvent } from '../DeletedEventProvider'
 import { useUserPreferences } from '../UserPreferencesProvider'
 import { BunkerSigner } from './bunker.signer'
 import { Nip07Signer } from './nip-07.signer'
+import { Nip55Signer } from './nip-55.signer'
 import { NostrConnectionSigner } from './nostrConnection.signer'
 import { NpubSigner } from './npub.signer'
 import { NsecSigner } from './nsec.signer'
@@ -92,7 +93,8 @@ type TNostrContext = {
   nsecLogin: (nsec: string, password?: string, needSetup?: boolean) => Promise<string>
   ncryptsecLogin: (ncryptsec: string) => Promise<string>
   nip07Login: () => Promise<string>
-  bunkerLogin: (bunker: string, pomegranateCentral?: string) => Promise<string>
+  nip55Login: () => Promise<string>
+  bunkerLogin: (bunker: string, pomegranateCentral?: string, needSetup?: boolean) => Promise<string>
   nostrConnectionLogin: (clientSecretKey: Uint8Array, connectionString: string) => Promise<string>
   npubLogin(npub: string): Promise<string>
   removeAccount: (account: TAccountPointer) => void
@@ -149,11 +151,25 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   currentAccount.current = account
   const [nsec, setNsec] = useState<string | null>(null)
   const [ncryptsec, setNcryptsec] = useState<string | null>(null)
-  const [signer, setSigner] = useState<ISigner | null>(null)
+  const [signer, setSignerState] = useState<ISigner | null>(null)
+  const signerRef = useRef<ISigner | null>(null)
+  const setSigner = (next: ISigner | null) => {
+    const previous = signerRef.current
+    if (
+      previous !== next &&
+      (previous instanceof BunkerSigner || previous instanceof NostrConnectionSigner)
+    ) {
+      void previous.close().catch(console.error)
+    }
+    signerRef.current = next
+    setSignerState(next)
+  }
+  const loginAttempt = useRef(0)
+  const cancelInitialization = useRef<(() => void) | null>(null)
   const [openLoginDialog, setOpenLoginDialog] = useState(false)
   const [profile, setProfile] = useState<TProfile | null>(null)
   const [profileEvent, setProfileEvent] = useState<Event | null>(null)
-  const [relayList, setRelayList] = useState<TRelayList | null>(null)
+  const [relayList, setRelayList] = useAccountRelayList()
   const [followListEvent, setFollowListEvent] = useState<Event | null>(null)
   const [muteListEvent, setMuteListEvent] = useState<Event | null>(null)
   const [pinnedUsersEvent, setPinnedUsersEvent] = useState<Event | null>(null)
@@ -170,6 +186,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   } | null>(null)
 
   useEffect(() => {
+    let disposed = false
     const init = async () => {
       if (hasNostrLoginHash()) {
         return await loginByNostrLoginHash()
@@ -181,19 +198,33 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
 
       await loginWithAccountPointer(act)
     }
-    init().then(() => {
-      setIsInitialized(true)
+    const pending = init()
+    let cancel!: () => void
+    const cancelled = new Promise<void>((resolve) => {
+      cancel = resolve
     })
+    cancelInitialization.current = cancel
+    void Promise.race([pending, cancelled])
+      .catch((error) => console.error('Account restore failed:', error))
+      .finally(() => {
+        if (cancelInitialization.current === cancel) cancelInitialization.current = null
+        if (!disposed) setIsInitialized(true)
+      })
 
     const handleHashChange = () => {
       if (hasNostrLoginHash()) {
-        loginByNostrLoginHash()
+        void loginByNostrLoginHash().catch((error) => console.error('Login failed:', error))
       }
     }
 
     window.addEventListener('hashchange', handleHashChange)
 
     return () => {
+      disposed = true
+      cancel()
+      loginAttempt.current += 1
+      passwordPromiseRef.current?.reject()
+      passwordPromiseRef.current = null
       window.removeEventListener('hashchange', handleHashChange)
     }
   }, [])
@@ -529,19 +560,40 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  const login = (signer: ISigner, act: TAccount) => {
+  const beginLogin = () => {
+    cancelInitialization.current?.()
+    cancelInitialization.current = null
+    loginAttempt.current += 1
+    passwordPromiseRef.current?.reject()
+    passwordPromiseRef.current = null
+    setPasswordDialogOpen(false)
+    return loginAttempt.current
+  }
+
+  // Authentication belongs to each login path. Committing an authenticated
+  // session is synchronous, so no newer logout/switch can interleave with it.
+  const login = (signer: ISigner, act: TAccount, attempt: number) => {
+    if (attempt !== loginAttempt.current) {
+      if (signer instanceof BunkerSigner || signer instanceof NostrConnectionSigner) {
+        void signer.close().catch(console.error)
+      }
+      throw new Error('Login cancelled')
+    }
     const newAccounts = storage.addAccount(act)
     setAccounts(newAccounts)
     storage.switchAccount(act)
-    setAccount({ pubkey: act.pubkey, signerType: act.signerType })
+    currentAccount.current = { pubkey: act.pubkey, signerType: act.signerType }
+    setAccount(currentAccount.current)
     setSigner(signer)
     return act.pubkey
   }
 
   const removeAccount = (act: TAccountPointer) => {
+    beginLogin()
     const newAccounts = storage.removeAccount(act)
     setAccounts(newAccounts)
-    if (account?.pubkey === act.pubkey) {
+    if (isSameAccount(currentAccount.current, act)) {
+      currentAccount.current = null
       setAccount(null)
       setSigner(null)
     }
@@ -552,16 +604,25 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   }
 
   const switchAccount = async (act: TAccountPointer | null) => {
+    const attempt = beginLogin()
     if (!act) {
+      currentAccount.current = null
       storage.switchAccount(null)
       setAccount(null)
       setSigner(null)
       return
     }
-    await loginWithAccountPointer(act)
+    try {
+      await loginWithAccountPointer(act, attempt)
+    } catch (error) {
+      if (attempt === loginAttempt.current) {
+        toast.error(t('Login failed') + ': ' + (error as Error).message)
+      }
+    }
   }
 
   const nsecLogin = async (nsecOrHex: string, password?: string, needSetup?: boolean) => {
+    const attempt = beginLogin()
     const nsecSigner = new NsecSigner()
     let privkey: Uint8Array
     if (nsecOrHex.startsWith('nsec')) {
@@ -576,33 +637,46 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
       throw new Error('invalid nsec or hex')
     }
     const pubkey = nsecSigner.login(privkey)
-    if (password) {
-      const ncryptsec = nip49.encrypt(privkey, password)
-      login(nsecSigner, { pubkey, signerType: 'ncryptsec', ncryptsec })
-    } else {
-      login(nsecSigner, { pubkey, signerType: 'nsec', nsec: nip19.nsecEncode(privkey) })
-    }
-    if (needSetup) {
-      setupNewUser(nsecSigner)
-    }
-    return pubkey
+    const newAccount: TAccount = password
+      ? { pubkey, signerType: 'ncryptsec', ncryptsec: nip49.encrypt(privkey, password) }
+      : { pubkey, signerType: 'nsec', nsec: nip19.nsecEncode(privkey) }
+    if (needSetup) await setupNewUser(nsecSigner)
+    return login(nsecSigner, newAccount, attempt)
   }
 
   const ncryptsecLogin = async (ncryptsec: string) => {
+    const attempt = beginLogin()
     const password = await requestPassword()
     const privkey = nip49.decrypt(ncryptsec, password)
     const browserNsecSigner = new NsecSigner()
     const pubkey = browserNsecSigner.login(privkey)
-    return login(browserNsecSigner, { pubkey, signerType: 'ncryptsec', ncryptsec })
+    return login(browserNsecSigner, { pubkey, signerType: 'ncryptsec', ncryptsec }, attempt)
   }
 
   const npubLogin = async (npub: string) => {
+    const attempt = beginLogin()
     const npubSigner = new NpubSigner()
     const pubkey = npubSigner.login(npub)
-    return login(npubSigner, { pubkey, signerType: 'npub', npub })
+    return login(npubSigner, { pubkey, signerType: 'npub', npub }, attempt)
+  }
+
+  const nip55Login = async () => {
+    const attempt = beginLogin()
+    const signer = await Nip55Signer.login()
+    const pubkey = await signer.getPublicKey()
+    return login(
+      signer,
+      {
+        pubkey,
+        signerType: 'nip-55',
+        signerPackageName: signer.packageName
+      },
+      attempt
+    )
   }
 
   const nip07Login = async () => {
+    const attempt = beginLogin()
     try {
       const nip07Signer = new Nip07Signer()
       await nip07Signer.init()
@@ -610,16 +684,19 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
       if (!pubkey) {
         throw new Error('You did not allow to access your pubkey')
       }
-      return login(nip07Signer, { pubkey, signerType: 'nip-07' })
+      return login(nip07Signer, { pubkey, signerType: 'nip-07' }, attempt)
     } catch (err) {
-      toast.error(t('Login failed') + ': ' + (err as Error).message)
+      if (attempt === loginAttempt.current) {
+        toast.error(t('Login failed') + ': ' + (err as Error).message)
+      }
       throw err
     }
   }
 
   // `pomegranateCentral` is set for accounts created via "Login with Google";
   // persisting it marks the account as a pomegranate account.
-  const bunkerLogin = async (bunker: string, pomegranateCentral?: string) => {
+  const bunkerLogin = async (bunker: string, pomegranateCentral?: string, needSetup = false) => {
+    const attempt = beginLogin()
     const bunkerSigner = new BunkerSigner()
     const pubkey = await bunkerSigner.login(bunker)
     if (!pubkey) {
@@ -627,16 +704,22 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     }
     const bunkerUrl = new URL(bunker)
     bunkerUrl.searchParams.delete('secret')
-    return login(bunkerSigner, {
-      pubkey,
-      signerType: 'bunker',
-      bunker: bunkerUrl.toString(),
-      bunkerClientSecretKey: bunkerSigner.getClientSecretKey(),
-      ...(pomegranateCentral ? { pomegranateCentral } : {})
-    })
+    if (needSetup) await setupNewUser(bunkerSigner)
+    return login(
+      bunkerSigner,
+      {
+        pubkey,
+        signerType: 'bunker',
+        bunker: bunkerUrl.toString(),
+        bunkerClientSecretKey: bunkerSigner.getClientSecretKey(),
+        ...(pomegranateCentral ? { pomegranateCentral } : {})
+      },
+      attempt
+    )
   }
 
   const nostrConnectionLogin = async (clientSecretKey: Uint8Array, connectionString: string) => {
+    const attempt = beginLogin()
     const bunkerSigner = new NostrConnectionSigner(clientSecretKey, connectionString)
     const loginResult = await bunkerSigner.login()
     if (!loginResult.pubkey) {
@@ -644,15 +727,22 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     }
     const bunkerUrl = new URL(loginResult.bunkerString!)
     bunkerUrl.searchParams.delete('secret')
-    return login(bunkerSigner, {
-      pubkey: loginResult.pubkey,
-      signerType: 'bunker',
-      bunker: bunkerUrl.toString(),
-      bunkerClientSecretKey: bunkerSigner.getClientSecretKey()
-    })
+    return login(
+      bunkerSigner,
+      {
+        pubkey: loginResult.pubkey,
+        signerType: 'bunker',
+        bunker: bunkerUrl.toString(),
+        bunkerClientSecretKey: bunkerSigner.getClientSecretKey()
+      },
+      attempt
+    )
   }
 
-  const loginWithAccountPointer = async (act: TAccountPointer): Promise<string | null> => {
+  const loginWithAccountPointer = async (
+    act: TAccountPointer,
+    attempt = beginLogin()
+  ): Promise<string | null> => {
     let account = storage.findAccount(act)
     if (!account) {
       return null
@@ -660,14 +750,14 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     if (account.signerType === 'nsec' || account.signerType === 'browser-nsec') {
       if (account.nsec) {
         const browserNsecSigner = new NsecSigner()
-        browserNsecSigner.login(account.nsec)
+        if (browserNsecSigner.login(account.nsec) !== account.pubkey) {
+          throw new Error('Signer public key does not match account')
+        }
         // Migrate to nsec
         if (account.signerType === 'browser-nsec') {
-          storage.removeAccount(account)
           account = { ...account, signerType: 'nsec' }
-          storage.addAccount(account)
         }
-        return login(browserNsecSigner, account)
+        return login(browserNsecSigner, account, attempt)
       }
     } else if (account.signerType === 'ncryptsec') {
       if (account.ncryptsec) {
@@ -675,8 +765,10 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
           const password = await requestPassword()
           const privkey = nip49.decrypt(account.ncryptsec, password)
           const browserNsecSigner = new NsecSigner()
-          browserNsecSigner.login(privkey)
-          return login(browserNsecSigner, account)
+          if (browserNsecSigner.login(privkey) !== account.pubkey) {
+            throw new Error('Signer public key does not match account')
+          }
+          return login(browserNsecSigner, account, attempt)
         } catch {
           return null
         }
@@ -684,26 +776,33 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     } else if (account.signerType === 'nip-07') {
       const nip07Signer = new Nip07Signer()
       await nip07Signer.init()
-      return login(nip07Signer, account)
+      if ((await nip07Signer.getPublicKey()) !== account.pubkey) {
+        throw new Error('Signer public key does not match account')
+      }
+      return login(nip07Signer, account, attempt)
     } else if (account.signerType === 'bunker') {
       if (account.bunker && account.bunkerClientSecretKey) {
         const bunkerSigner = new BunkerSigner(account.bunkerClientSecretKey)
-        await bunkerSigner.login(account.bunker, false)
-        return login(bunkerSigner, account)
+        await bunkerSigner.restore(account.bunker, account.pubkey)
+        return login(bunkerSigner, account, attempt)
+      }
+    } else if (account.signerType === 'nip-55') {
+      if (isAndroid() && account.signerPackageName) {
+        return login(new Nip55Signer(account.pubkey, account.signerPackageName), account, attempt)
       }
     } else if (account.signerType === 'npub' && account.npub) {
       const npubSigner = new NpubSigner()
       const pubkey = npubSigner.login(account.npub)
       if (!pubkey) {
-        storage.removeAccount(account)
         return null
       }
       if (pubkey !== account.pubkey) {
-        storage.removeAccount(account)
-        account = { ...account, pubkey }
-        storage.addAccount(account)
+        const previous = account
+        const result = login(npubSigner, { ...account, pubkey }, attempt)
+        setAccounts(storage.removeAccount(previous))
+        return result
       }
-      return login(npubSigner, account)
+      return login(npubSigner, account, attempt)
     }
     // Missing credentials can be caused by a transient safeStorage or IPC
     // failure. Automatic login must never turn that into destructive logout.
@@ -728,6 +827,10 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         nsecSigner.login(privkey)
         return nsecSigner
       }
+    } else if (account.signerType === 'nip-55') {
+      if (isAndroid() && account.signerPackageName) {
+        return new Nip55Signer(account.pubkey, account.signerPackageName)
+      }
     } else if (account.signerType === 'nip-07') {
       const nip07Signer = new Nip07Signer()
       await nip07Signer.init()
@@ -735,7 +838,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     } else if (account.signerType === 'bunker') {
       if (account.bunker && account.bunkerClientSecretKey) {
         const bunkerSigner = new BunkerSigner(account.bunkerClientSecretKey)
-        await bunkerSigner.login(account.bunker, false)
+        await bunkerSigner.restore(account.bunker, account.pubkey)
         return bunkerSigner
       }
     }
@@ -768,17 +871,15 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   }
 
   const setupNewUser = async (signer: ISigner) => {
-    const defaultRelays = getDefaultRelayUrls()
-    await Promise.allSettled([
-      client.publishEvent(defaultRelays, await signer.signEvent(createFollowListDraftEvent([]))),
-      client.publishEvent(defaultRelays, await signer.signEvent(createMuteListDraftEvent([]))),
-      client.publishEvent(
-        defaultRelays,
-        await signer.signEvent(
-          createRelayListDraftEvent(defaultRelays.map((url) => ({ url, scope: 'both' })))
-        )
-      )
-    ])
+    try {
+      const results = await setupNewAccount(signer)
+      const failures = results.filter((result) => result.status === 'rejected')
+      if (failures.length) {
+        console.warn('Some new account defaults could not be initialized:', failures)
+      }
+    } catch (error) {
+      console.warn('Failed to initialize new account lists:', error)
+    }
   }
 
   const signEvent = async (draftEvent: TDraftEvent) => {
@@ -1017,6 +1118,7 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
         nsecLogin,
         ncryptsecLogin,
         nip07Login,
+        nip55Login,
         bunkerLogin,
         nostrConnectionLogin,
         npubLogin,

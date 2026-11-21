@@ -1307,6 +1307,11 @@ export default {
     'Hide this section': 'Szakasz elrejtése',
     Participants: 'Résztvevők',
     'Reposts × 1 · Quotes × 2 · Loaded replies × 1':
-      'Újraosztások × 1 · Idézetek × 2 · Betöltött válaszok × 1'
+      'Újraosztások × 1 · Idézetek × 2 · Betöltött válaszok × 1',
+    'Share profile': 'Profil megosztása',
+    'Login with Android signer': 'Bejelentkezés Android-aláíróval',
+    'Profile followed by': 'Követői',
+    'People you follow who also follow this user.':
+      'Az általad követett emberek, akik ezt a felhasználót is követik.'
   }
 }

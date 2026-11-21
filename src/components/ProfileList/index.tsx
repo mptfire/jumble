@@ -1,7 +1,16 @@
+import { cn } from '@/lib/utils'
 import { useEffect, useRef, useState } from 'react'
 import UserItem from '../UserItem'
 
-export default function ProfileList({ pubkeys }: { pubkeys: string[] }) {
+export default function ProfileList({
+  pubkeys,
+  hideFollowButton,
+  className
+}: {
+  pubkeys: string[]
+  hideFollowButton?: boolean
+  className?: string
+}) {
   const [visiblePubkeys, setVisiblePubkeys] = useState<string[]>([])
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -35,9 +44,9 @@ export default function ProfileList({ pubkeys }: { pubkeys: string[] }) {
   }, [visiblePubkeys, pubkeys])
 
   return (
-    <div className="px-4 pt-2">
+    <div className={cn('px-4 pt-2', className)}>
       {visiblePubkeys.map((pubkey, index) => (
-        <UserItem key={`${index}-${pubkey}`} userId={pubkey} />
+        <UserItem key={`${index}-${pubkey}`} userId={pubkey} hideFollowButton={hideFollowButton} />
       ))}
       {pubkeys.length > visiblePubkeys.length && <div ref={bottomRef} />}
     </div>

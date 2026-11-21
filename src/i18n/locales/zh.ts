@@ -1295,6 +1295,10 @@ export default {
       '在宽屏单列模式下显示于 feed 旁。',
     'Hide this section': '关闭此板块',
     Participants: '参与者',
-    'Reposts × 1 · Quotes × 2 · Loaded replies × 1': '转发 × 1 · 引用 × 2 · 已加载回复 × 1'
+    'Reposts × 1 · Quotes × 2 · Loaded replies × 1': '转发 × 1 · 引用 × 2 · 已加载回复 × 1',
+    'Share profile': '分享个人主页',
+    'Login with Android signer': '使用 Android 签名器登录',
+    'Profile followed by': '关注者',
+    'People you follow who also follow this user.': '你关注的人中，也关注了该用户的人。'
   }
 }

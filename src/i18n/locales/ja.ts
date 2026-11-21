@@ -1303,6 +1303,11 @@ export default {
     'Hide this section': 'このセクションを非表示',
     Participants: '参加者',
     'Reposts × 1 · Quotes × 2 · Loaded replies × 1':
-      'リポスト × 1 · 引用 × 2 · 読み込み済みの返信 × 1'
+      'リポスト × 1 · 引用 × 2 · 読み込み済みの返信 × 1',
+    'Share profile': 'プロフィールを共有',
+    'Login with Android signer': 'Android署名アプリでログイン',
+    'Profile followed by': 'フォロワー',
+    'People you follow who also follow this user.':
+      'あなたがフォローしている人のうち、このユーザーもフォローしている人です。'
   }
 }

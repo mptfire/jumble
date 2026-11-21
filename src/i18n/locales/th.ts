@@ -1284,6 +1284,10 @@ export default {
     'Hide this section': 'ซ่อนส่วนนี้',
     Participants: 'ผู้เข้าร่วม',
     'Reposts × 1 · Quotes × 2 · Loaded replies × 1':
-      'รีโพสต์ × 1 · อ้างอิง × 2 · คำตอบที่โหลดแล้ว × 1'
+      'รีโพสต์ × 1 · อ้างอิง × 2 · คำตอบที่โหลดแล้ว × 1',
+    'Share profile': 'แชร์โปรไฟล์',
+    'Login with Android signer': 'เข้าสู่ระบบด้วยแอปลงนาม Android',
+    'Profile followed by': 'ติดตามโดย',
+    'People you follow who also follow this user.': 'คนที่คุณติดตามซึ่งติดตามผู้ใช้นี้ด้วย'
   }
 }
