@@ -3,6 +3,7 @@ import { getReplaceableCoordinateFromEvent } from '@/lib/event'
 import { getEmojiPackInfoFromEvent, getEmojisAndEmojiSetsFromEvent } from '@/lib/event-metadata'
 import client from '@/services/client.service'
 import recentEmojiService from '@/services/recent-emoji.service'
+import { DEFAULT_EMOJI_PACKS } from '@/constants'
 import { TEmoji, TEmojiPack } from '@/types'
 import { sha256 } from '@noble/hashes/sha2.js'
 import FlexSearch from 'flexsearch'
@@ -43,16 +44,15 @@ class CustomEmojiService {
     this.standaloneEmojis = []
     this.packs = []
 
-    if (!userEmojiListEvent) {
-      this.publishCollections()
-      return
-    }
-
-    const { emojis, emojiSetPointers } = getEmojisAndEmojiSetsFromEvent(userEmojiListEvent)
+    const { emojis, emojiSetPointers } = userEmojiListEvent
+      ? getEmojisAndEmojiSetsFromEvent(userEmojiListEvent)
+      : { emojis: [] as TEmoji[], emojiSetPointers: [] as string[] }
     this.standaloneEmojis = emojis
     await this.addEmojisToIndex(emojis)
 
-    const emojiSetEvents = await client.fetchEmojiSetEvents(emojiSetPointers, false)
+    // privacy fork: merge site-wide default packs after the account's own pointers
+    const allPointers = Array.from(new Set([...emojiSetPointers, ...DEFAULT_EMOJI_PACKS]))
+    const emojiSetEvents = await client.fetchEmojiSetEvents(allPointers, false)
     const packs: TEmojiPack[] = []
     await Promise.allSettled(
       emojiSetEvents.map(async (event) => {
@@ -70,8 +70,8 @@ class CustomEmojiService {
         await this.addEmojisToIndex(emojisWithSet)
       })
     )
-    // Preserve a-tag order from the user's kind 10030 event
-    const orderIndex = new Map(emojiSetPointers.map((p, i) => [p, i]))
+    // Preserve a-tag order from the user's kind 10030 event (default packs follow)
+    const orderIndex = new Map(allPointers.map((p, i) => [p, i]))
     packs.sort((a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0))
     this.packs = packs
 

@@ -1,0 +1,7 @@
+# Prebuilt variant: serves an already-compiled ./dist instead of compiling on the
+# server. Used when the VPS is short on RAM (npm ci + vite build compete with the
+# other containers). Build the dist on a workstation, ship it, then:
+#   cd deploy && docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml up -d --build
+FROM caddy:2-alpine
+COPY dist /srv
+COPY deploy/Caddyfile.internal /etc/caddy/Caddyfile

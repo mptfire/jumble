@@ -34,7 +34,9 @@ export const OWNER_RELAY_URLS = [
   'wss://nos.lol/',
   'wss://nostr.wine/',
   'wss://nostr.mom/',
-  'wss://relay.fountain.fm/'
+  'wss://relay.fountain.fm/',
+  'wss://nostr.land/',
+  'wss://relay.damus.io/'
 ]
 
 export const StorageKey = {
@@ -170,7 +172,19 @@ export const BIG_RELAY_URLS = [
   'wss://nos.lol/',
   'wss://relay.primal.net/',
   'wss://offchain.pub/',
-  'wss://relay.ditto.pub/'
+  'wss://relay.ditto.pub/',
+  // 2026-11-08: fresh, fast responders verified
+  'wss://nostr.land/',
+  'wss://relay.damus.io/',
+  'wss://nostr.wine/'
+]
+
+// privacy fork: emoji packs every visitor of this instance gets by default, whether or not
+// they are logged in and whether or not their own kind 10030 references them. Merged into
+// the pointer list in custom-emoji.service.init(); the account's own a-tags still come first.
+export const DEFAULT_EMOJI_PACKS = [
+  '30030:1408bad049bab8a38b976075affe413c3521bbeef62cc4ce3555299f4971f2ca:steve-dogtoshi',
+  '30030:1408bad049bab8a38b976075affe413c3521bbeef62cc4ce3555299f4971f2ca:steve-dogtoshi-animated-v2'
 ]
 
 // privacy fork: search.nostrarchives.com dropped (HTTP 400, no NIP-11)

@@ -1,0 +1,7 @@
+# Override: use the prebuilt-dist Dockerfile (no npm ci / vite build on the VPS).
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prebuilt.yml up -d --build
+services:
+  jumble:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.prebuilt
