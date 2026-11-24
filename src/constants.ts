@@ -28,15 +28,20 @@ export const OWNER_BLOSSOM_SERVERS = [
   'https://canoe.rtard.de/',
   'https://blossom.mptfire.de/'
 ]
+// 2026-11-24 (project jumble-relays): mirrors the owner's PUBLISHED kind 10002 relay list —
+// two own relays first, then the public relays verified to hold the owner's notes. Paid
+// nostr.wine / nostr.land dropped from this seed: both reject the owner's writes
+// (payment_required). Keep in sync with ~/Blitzwolf/dev/nostr/publish-relay-list-*.sh.
 export const OWNER_RELAY_URLS = [
   'wss://canoe.rtard.de/',
   'wss://relay.mptfire.de/',
   'wss://nos.lol/',
-  'wss://nostr.wine/',
+  'wss://relay.primal.net/',
+  'wss://relay.damus.io/',
   'wss://nostr.mom/',
-  'wss://relay.fountain.fm/',
-  'wss://nostr.land/',
-  'wss://relay.damus.io/'
+  'wss://relay.satlantis.io/',
+  'wss://relay.divine.video/',
+  'wss://relay.fountain.fm/'
 ]
 
 export const StorageKey = {

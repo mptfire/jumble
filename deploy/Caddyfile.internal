@@ -10,4 +10,12 @@
 	@immutable path /assets/*
 	header @immutable Cache-Control "public, max-age=31536000, immutable"
 	header / Cache-Control "no-cache"
+
+	# 2026-11-24: clickjacking + feature policy. The CSP lives in index.html; its
+	# frame-ancestors directive would be IGNORED in a <meta> policy, so it has to be a
+	# header. camera/microphone stay 'self' - Jumble records picture and voice notes.
+	header {
+		X-Frame-Options "DENY"
+		Permissions-Policy "camera=(self), microphone=(self), display-capture=(), payment=()"
+	}
 }

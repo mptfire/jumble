@@ -46,6 +46,13 @@ Two constants in `src/constants.ts`, deliberately separate:
   touch, then rebuild.
 - `OWNER_RELAY_URLS` — the **owner's** login seed set (canoe first, then strfry + active
   relays), written once per browser on owner login. Not used for site defaults.
+  Since 2026-11-24 it mirrors the owner's **published kind 10002 relay list** (9 relays:
+  canoe, strfry, nos.lol, primal, damus, nostr.mom, satlantis, divine.video, fountain.fm).
+  Paid `nostr.wine` / `nostr.land` were dropped from this seed — both advertise
+  `payment_required` and reject the owner's writes. Evidence + re-publish script:
+  `~/Blitzwolf/dev/notes/jumble-relay-review-2026-11-24.md`.
+- `deploy/Caddyfile.internal` also sets `X-Frame-Options: DENY` and a `Permissions-Policy`
+  (2026-11-24). The `<meta>` CSP cannot carry `frame-ancestors`, so it must stay a header.
 
 ## Updating (tarball swap)
 
